@@ -63,15 +63,15 @@ public static class SmokeTest
             lines.Add($"pc-resave skipped={again.SkippedCount}");
             ok &= again.SkippedCount == scan.AllItems.Count && again.SavedCount == 0;
 
-            // 封面链路：名称反查 → 图标直链 → 本地缓存
+            // 封面链路：名称反查 → 官方直链（图标/横幅）→ 本地缓存
             var titleDb = TitleDbService.LoadEmbedded();
             var tid = titleDb?.GetTitleIdByName("塞尔达传说 王国之泪");
             var coverService = new CoverService(settings, Path.Combine(root, "covers"));
             try
             {
-                var cover = await coverService.ResolveAsync(
-                    tid, "塞尔达传说 王国之泪", titleDb?.GetIconUrl(tid!), CancellationToken.None);
-                lines.Add($"cover tid={tid} icon={titleDb?.GetIconUrl(tid!)} path={cover}");
+                var urls = tid != null ? titleDb?.GetCoverUrls(tid) : null;
+                var cover = await coverService.ResolveAsync(tid, "塞尔达传说 王国之泪", urls, CancellationToken.None);
+                lines.Add($"cover tid={tid} urls={(urls?.Count ?? 0)} path={cover}");
                 ok &= tid == "0100F2C0115B6000" && cover != null && File.Exists(cover);
             }
             catch (Exception ex)

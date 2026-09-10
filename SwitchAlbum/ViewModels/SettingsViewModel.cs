@@ -33,7 +33,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         _autoRename = settings.Current.AutoRename;
         _themeOption = MapToOption(theme.Theme);
         _apiKey = settings.Current.SteamGridDbApiKey ?? "";
-        _mockEnabled = settings.Current.MockModeEnabled;
         _ = LoadPhonesAsync();
     }
 
@@ -41,11 +40,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _autoRename;
     [ObservableProperty] private string _themeOption;
     [ObservableProperty] private string _apiKey;
-    [ObservableProperty] private bool _mockEnabled;
     [ObservableProperty] private PhoneOption? _selectedPhone;
-
-    /// <summary>模拟模式开关是否在本次设置中发生变化（供主界面重建设备提供者）。</summary>
-    public bool MockChanged { get; private set; }
 
     public ObservableCollection<PhoneOption> Phones { get; } = new();
 
@@ -84,9 +79,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         _settings.Current.AutoRename = AutoRename;
         _settings.Current.SteamGridDbApiKey = string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey.Trim();
 
-        MockChanged = MockEnabled != _settings.Current.MockModeEnabled;
-        _settings.Current.MockModeEnabled = MockEnabled;
-
         _settings.Current.PhoneDeviceId = SelectedPhone?.Id;
         _settings.Current.PhoneFriendlyName = SelectedPhone?.Name;
         _settings.Save();
@@ -111,12 +103,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             // 打开失败忽略
         }
-    }
-
-    [RelayCommand]
-    private void RegenMockData()
-    {
-        DemoAlbumGenerator.Generate(_settings.Current.MockAlbumPath);
     }
 
     private async Task LoadPhonesAsync()

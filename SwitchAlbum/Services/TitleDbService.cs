@@ -27,7 +27,7 @@ public sealed class TitleDbService : ITitleDb
 
     private readonly Dictionary<string, TitleNames> _byId = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _byName = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, string> _icons = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string[]> _coverUrls = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<char, string> _t2sChar = new();
     private readonly List<(string Key, string Value)> _t2sMulti = new();
 
@@ -64,10 +64,14 @@ public sealed class TitleDbService : ITitleDb
             }
 
             _byId[tid] = names;
-            var icon = GetString(value, "icon");
-            if (icon != null)
+
+            var urls = new[] { GetString(value, "icon"), GetString(value, "banner"), GetString(value, "box") }
+                .Where(u => !string.IsNullOrEmpty(u))
+                .Cast<string>()
+                .ToArray();
+            if (urls.Length > 0)
             {
-                _icons[tid] = icon;
+                _coverUrls[tid] = urls;
             }
 
             RegisterName(names.Zh, tid);
@@ -82,8 +86,12 @@ public sealed class TitleDbService : ITitleDb
     public string? GetTitleIdByName(string titleName)
         => _byName.TryGetValue(Normalize(titleName), out var tid) ? tid : null;
 
+    /// <summary>TitleId → 封面候选图直链（按 图标→横幅→盒装 顺序），无则空数组。</summary>
+    public IReadOnlyList<string> GetCoverUrls(string titleId)
+        => _coverUrls.TryGetValue(titleId, out var urls) ? urls : Array.Empty<string>();
+
     public string? GetIconUrl(string titleId)
-        => _icons.TryGetValue(titleId, out var icon) ? icon : null;
+        => GetCoverUrls(titleId).FirstOrDefault();
 
     /// <summary>
     /// 规范化游戏名：小写、全角转半角、剔除空白与标点符号。

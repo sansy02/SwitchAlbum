@@ -12,7 +12,6 @@ public static class Strings
     public const string Status_Connecting = "正在连接…";
     public const string Hint_ConnectSwitch = "未检测到 Switch。请用 USB 连接电脑，并在主机上依次进入 系统设置 → 数据管理 → 管理截图与视频 → 通过 USB 连接复制到电脑";
     public const string Hint_EmptyAlbum = "相册为空，或未找到 Album 目录";
-    public const string Hint_MockMode = "当前为模拟模式（演示数据）";
     public const string Status_RenamedNote = "已自动重命名 {0} 个文件";
 
     // 按钮
@@ -67,9 +66,6 @@ public static class Strings
     public const string Settings_PhoneDevice = "保存到手机的目标设备";
     public const string Settings_PhoneDevice_Auto = "自动检测";
     public const string Settings_ApiKey = "SteamGridDB API 密钥（可选，封面备选图源）";
-    public const string Settings_MockGroup = "模拟模式（没有 Switch 时预览界面）";
-    public const string Settings_Mock_Enable = "启用模拟模式";
-    public const string Settings_Mock_Regen = "重新生成演示数据";
     public const string Settings_PickFolder = "选择保存文件夹";
     public const string Settings_Close = "关闭";
 

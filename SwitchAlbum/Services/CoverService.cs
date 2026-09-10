@@ -5,9 +5,10 @@ using System.Text.Json;
 namespace SwitchAlbum.Services;
 
 /// <summary>
-/// 游戏封面服务：本地缓存 → tinfoil.media（免密钥，按 titleId）→
-/// SteamGridDB（可选，用户自填 API 密钥）→ 失败返回 null（UI 显示占位）。
-/// 每次会话内失败过的 titleId 不再重复请求。
+/// 游戏封面服务，候选链（每个源失败自动试下一个，单个源内部重试 1 次）：
+/// 任天堂官方直链（图标/横幅/盒装，来自 titles.json）→ tinfoil.media（按 titleId）→
+/// SteamGridDB（按名称，需用户密钥）→ 失败返回 null（UI 显示占位）。
+/// 成功结果按 key（titleId 或名称哈希）缓存到本地。
 /// </summary>
 public sealed class CoverService
 {
@@ -19,8 +20,6 @@ public sealed class CoverService
     private readonly SettingsService _settings;
     private readonly HttpClient _http;
     private readonly SemaphoreSlim _semaphore = new(4);
-    private readonly object _failLock = new();
-    private readonly HashSet<string> _failedThisSession = new(StringComparer.OrdinalIgnoreCase);
 
     public CoverService(SettingsService settings, string? cacheDir = null)
     {
@@ -30,7 +29,7 @@ public sealed class CoverService
             "SwitchAlbum", "covers");
         Directory.CreateDirectory(_cacheDir);
 
-        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("SwitchAlbum/1.0");
     }
 
@@ -40,12 +39,8 @@ public sealed class CoverService
         return File.Exists(path) ? path : null;
     }
 
-    /// <summary>
-    /// 候选链：本地缓存 → 任天堂官方图标直链（titles.json 内嵌）→
-    /// tinfoil.media（按 titleId）→ SteamGridDB（按名称，需用户密钥）。
-    /// 无 titleId 时跳过 tinfoil，按名称尝试 SteamGridDB。
-    /// </summary>
-    public async Task<string?> ResolveAsync(string? titleId, string title, string? iconUrl, CancellationToken ct)
+    public async Task<string?> ResolveAsync(
+        string? titleId, string title, IReadOnlyList<string>? coverUrls, CancellationToken ct)
     {
         var key = !string.IsNullOrEmpty(titleId) ? titleId : NameKey(title);
         var cached = GetCachedPath(key);
@@ -54,23 +49,20 @@ public sealed class CoverService
             return cached;
         }
 
-        lock (_failLock)
-        {
-            if (_failedThisSession.Contains(key))
-            {
-                return null;
-            }
-        }
-
         await _semaphore.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var path = CachePathOf(key);
 
-            if (!string.IsNullOrEmpty(iconUrl)
-                && await TryDownloadAsync(iconUrl, path, ct).ConfigureAwait(false))
+            if (coverUrls != null)
             {
-                return path;
+                foreach (var url in coverUrls)
+                {
+                    if (await TryDownloadAsync(url, path, ct).ConfigureAwait(false))
+                    {
+                        return path;
+                    }
+                }
             }
 
             if (!string.IsNullOrEmpty(titleId)
@@ -85,11 +77,7 @@ public sealed class CoverService
                 return path;
             }
 
-            lock (_failLock)
-            {
-                _failedThisSession.Add(key);
-            }
-
+            Log.Info($"封面获取失败: {title} (tid={titleId ?? "无"})，显示占位图");
             return null;
         }
         finally
@@ -108,29 +96,46 @@ public sealed class CoverService
 
     private async Task<bool> TryDownloadAsync(string url, string dest, CancellationToken ct)
     {
-        try
+        // 每个源尝试 2 次（网络抖动时第二次常成功）
+        for (var attempt = 1; attempt <= 2; attempt++)
         {
-            using var response = await _http.GetAsync(url, ct).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
+            try
             {
+                using var response = await _http.GetAsync(url, ct).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return false;
+                }
+
+                await using (var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false))
+                {
+                    await using var fs = File.Create(dest);
+                    await stream.CopyToAsync(fs, ct).ConfigureAwait(false);
+                }
+
+                // 校验必须在文件流关闭之后（File.Create 默认独占共享）
+                using var image = System.Drawing.Image.FromFile(dest);
+                if (image.Width > 0)
+                {
+                    return true;
+                }
+
+                TryDelete(dest);
                 return false;
             }
-
-            await using (var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false))
+            catch (Exception ex) when (attempt == 1)
             {
-                await using var fs = File.Create(dest);
-                await stream.CopyToAsync(fs, ct).ConfigureAwait(false);
+                Log.Info($"封面下载失败（第 {attempt} 次，将重试）: {url} — {ex.Message}");
             }
+            catch (Exception ex)
+            {
+                Log.Info($"封面下载失败: {url} — {ex.Message}");
+                TryDelete(dest);
+                return false;
+            }
+        }
 
-            // 校验必须在文件流关闭之后（File.Create 默认独占共享）
-            using var image = System.Drawing.Image.FromFile(dest);
-            return image.Width > 0;
-        }
-        catch
-        {
-            TryDelete(dest);
-            return false;
-        }
+        return false;
     }
 
     private async Task<bool> TrySteamGridAsync(string title, string dest, CancellationToken ct)

@@ -2,7 +2,7 @@ using System.Text.Json;
 
 // TitleDbGenerator：从 blawar/titledb 的 region 文件生成 SwitchAlbum 的紧凑 titles.json。
 // 用法: TitleDbGenerator <输出文件> <zhHans文件(CN.zh.json)> <zhHant文件(HK.zh.json)> <en文件(US.en.json)>
-// 输出格式: { "<TID>": { "zh": "...", "zht": "...", "en": "...", "icon": "https://..." } }
+// 输出格式: { "<TID>": { "zh": "...", "zht": "...", "en": "...", "icon": "...", "banner": "...", "box": "..." } }
 
 if (args.Length != 4)
 {
@@ -26,27 +26,33 @@ Entry GetEntry(string tid)
 var start = DateTime.Now;
 
 Console.WriteLine($"解析 {Path.GetFileName(args[1])}（简体中文）...");
-ParseFile(args[1], (tid, name, icon) =>
+ParseFile(args[1], (tid, name, icon, banner, box) =>
 {
     var entry = GetEntry(tid);
     entry.Zh ??= name;
     entry.Icon ??= icon;
+    entry.Banner ??= banner;
+    entry.Box ??= box;
 });
 
 Console.WriteLine($"解析 {Path.GetFileName(args[2])}（繁体中文）...");
-ParseFile(args[2], (tid, name, icon) =>
+ParseFile(args[2], (tid, name, icon, banner, box) =>
 {
     var entry = GetEntry(tid);
     entry.ZhHant ??= name;
     entry.Icon ??= icon;
+    entry.Banner ??= banner;
+    entry.Box ??= box;
 });
 
 Console.WriteLine($"解析 {Path.GetFileName(args[3])}（英文）...");
-ParseFile(args[3], (tid, name, icon) =>
+ParseFile(args[3], (tid, name, icon, banner, box) =>
 {
     var entry = GetEntry(tid);
     entry.En ??= name;
     entry.Icon ??= icon;
+    entry.Banner ??= banner;
+    entry.Box ??= box;
 });
 
 Console.WriteLine($"共 {entries.Count} 个游戏，解析耗时 {(DateTime.Now - start).TotalSeconds:F1}s，写出中...");
@@ -68,6 +74,8 @@ using (var writer = new Utf8JsonWriter(output, new JsonWriterOptions { Indented 
         WriteString(writer, "zht", entry.ZhHant);
         WriteString(writer, "en", entry.En);
         WriteString(writer, "icon", entry.Icon);
+        WriteString(writer, "banner", entry.Banner);
+        WriteString(writer, "box", entry.Box);
         writer.WriteEndObject();
     }
 
@@ -77,7 +85,7 @@ using (var writer = new Utf8JsonWriter(output, new JsonWriterOptions { Indented 
 Console.WriteLine("完成: " + new FileInfo(args[0]).Length / 1024 / 1024 + " MB");
 return 0;
 
-void ParseFile(string path, Action<string, string, string> apply)
+void ParseFile(string path, Action<string, string, string, string, string> apply)
 {
     var bytes = File.ReadAllBytes(path);
     var reader = new Utf8JsonReader(bytes, isFinalBlock: true, default);
@@ -88,6 +96,8 @@ void ParseFile(string path, Action<string, string, string> apply)
     string? field = null;
     string? name = null;
     string? icon = null;
+    string? banner = null;
+    string? box = null;
 
     while (reader.Read())
     {
@@ -117,6 +127,12 @@ void ParseFile(string path, Action<string, string, string> apply)
                     case "iconUrl":
                         icon = reader.GetString();
                         break;
+                    case "bannerUrl":
+                        banner = reader.GetString();
+                        break;
+                    case "frontBoxArt":
+                        box = reader.GetString();
+                        break;
                 }
 
                 break;
@@ -124,7 +140,7 @@ void ParseFile(string path, Action<string, string, string> apply)
                 var key = tid ?? outerKey;
                 if (key != null && key.Length == 16 && key.All(Uri.IsHexDigit) && name != null)
                 {
-                    apply(key.ToUpperInvariant(), name, icon ?? "");
+                    apply(key.ToUpperInvariant(), name, icon ?? "", banner ?? "", box ?? "");
                 }
 
                 depth = 1;
@@ -132,6 +148,8 @@ void ParseFile(string path, Action<string, string, string> apply)
                 field = null;
                 name = null;
                 icon = null;
+                banner = null;
+                box = null;
                 break;
             case JsonTokenType.EndObject when depth == 1:
                 depth = 0;
@@ -154,6 +172,8 @@ internal sealed class Entry
     public string? ZhHant { get; set; }
     public string? En { get; set; }
     public string? Icon { get; set; }
+    public string? Banner { get; set; }
+    public string? Box { get; set; }
 
     public bool IsEmpty => Zh == null && ZhHant == null && En == null;
 }

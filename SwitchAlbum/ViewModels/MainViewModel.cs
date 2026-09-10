@@ -103,31 +103,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     // ---------- 设备 ----------
-    private IMediaProvider CreateProvider()
-    {
-        if (_settings.Current.MockModeEnabled)
-        {
-            var albumPath = _settings.Current.MockAlbumPath;
-            if (!Directory.Exists(Path.Combine(albumPath, "Album")))
-            {
-                DemoAlbumGenerator.Generate(albumPath);
-            }
-
-            return new MockMediaProvider(albumPath, _settings.Current.MockPhonePath);
-        }
-
-        return new MtpMediaProvider();
-    }
-
-    private async Task SwitchProviderAsync()
-    {
-        var old = _provider;
-        old.DeviceChanged -= OnDeviceChanged;
-        (old as IDisposable)?.Dispose();
-        _provider = CreateProvider();
-        _provider.DeviceChanged += OnDeviceChanged;
-        await RescanAsync();
-    }
+    private static IMediaProvider CreateProvider() => new MtpMediaProvider();
 
     private async Task DisposeSessionAsync()
     {
@@ -380,8 +356,8 @@ public partial class MainViewModel : ObservableObject
 
     public Task<string?> ResolveCoverAsync(string? titleId, string title)
     {
-        var iconUrl = titleId != null ? _titleDb?.GetIconUrl(titleId) : null;
-        return _coverService.ResolveAsync(titleId, title, iconUrl, CancellationToken.None);
+        var urls = titleId != null ? _titleDb?.GetCoverUrls(titleId) : null;
+        return _coverService.ResolveAsync(titleId, title, urls, CancellationToken.None);
     }
 
     // ---------- 保存到电脑 ----------
@@ -614,21 +590,12 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task OpenSettingsAsync()
+    private void OpenSettingsAsync()
     {
         var viewModel = new SettingsViewModel(_settings, _theme, _provider);
         var dialog = new Views.SettingsDialog(viewModel) { Owner = _owner };
         dialog.ShowDialog();
         SavePathText = _settings.Current.SavePath;
-
-        if (viewModel.MockChanged)
-        {
-            await SwitchProviderAsync();
-            if (_settings.Current.MockModeEnabled)
-            {
-                ShowToast(Strings.Hint_MockMode);
-            }
-        }
     }
 
     [RelayCommand]
