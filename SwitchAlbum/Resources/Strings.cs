@@ -32,6 +32,11 @@ public static class Strings
 
     // 标签
     public const string Lbl_SavePath = "保存位置";
+    public const string Wall_SearchHint = "搜索游戏";
+    public const string Wall_NoResults = "没有找到匹配的游戏";
+    public const string Sort_NewestFirst = "从新到旧";
+    public const string Sort_OldestFirst = "从旧到新";
+    public const string Sort_Tooltip = "按拍摄时间排序";
     public const string Lbl_Selected = "已选 {0} 项";
     public const string Card_AllGames = "全部";
     public const string Card_PhotoCount = "{0} 张照片";

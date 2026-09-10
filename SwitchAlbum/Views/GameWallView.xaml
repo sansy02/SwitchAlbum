@@ -1,19 +1,56 @@
 <UserControl x:Class="SwitchAlbum.Views.GameWallView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:controls="clr-namespace:SwitchAlbum.Controls">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="26,24,26,24">
-        <ItemsControl ItemsSource="{Binding Cards}" controls:StaggerBehavior.Enabled="True">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <WrapPanel/>
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <controls:GameCard Margin="9"/>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
-    </ScrollViewer>
+             xmlns:res="clr-namespace:SwitchAlbum.Resources"
+             xmlns:controls="clr-namespace:SwitchAlbum.Controls"
+             xmlns:conv="clr-namespace:SwitchAlbum.Converters">
+    <UserControl.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
+    </UserControl.Resources>
+    <Grid Margin="26,20,26,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- 搜索栏 -->
+        <Grid HorizontalAlignment="Right" Width="250">
+            <TextBox x:Name="SearchBox" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                     Padding="12,7" FontSize="13"/>
+            <TextBlock Text="{x:Static res:Strings.Wall_SearchHint}" IsHitTestVisible="False" Margin="14,0,0,0"
+                       VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,16,0,24">
+            <ItemsControl ItemsSource="{Binding Cards}" controls:StaggerBehavior.Enabled="True">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <controls:GameCard Margin="9"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- 搜索无结果 -->
+        <TextBlock Grid.Row="1" Text="{x:Static res:Strings.Wall_NoResults}" HorizontalAlignment="Center"
+                   VerticalAlignment="Top" Margin="0,60,0,0" FontSize="13"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   Visibility="{Binding NoResults, Converter={StaticResource BoolToVis}}"/>
+    </Grid>
 </UserControl>

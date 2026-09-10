@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>SwitchAlbum</RootNamespace>
     <AssemblyName>SwitchAlbum</AssemblyName>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
