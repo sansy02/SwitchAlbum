@@ -77,7 +77,6 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private LightboxViewModel? _lightbox;
     [ObservableProperty] private string _hintText = "";
     [ObservableProperty] private bool _hintVisible;
-    [ObservableProperty] private bool _tryMockVisible;
     [ObservableProperty] private string _toastText = "";
     [ObservableProperty] private bool _toastVisible;
     [ObservableProperty] private string _savePathText;
@@ -182,14 +181,8 @@ public partial class MainViewModel : ObservableObject
         Grid = null;
         CloseLightbox();
         ShowWall = true;
-        ShowEmptyHint(Strings.Hint_ConnectSwitch, showTryMock: !_settings.Current.MockModeEnabled);
-    }
-
-    private void ShowEmptyHint(string text, bool showTryMock)
-    {
-        HintText = text;
+        HintText = Strings.Hint_ConnectSwitch;
         HintVisible = true;
-        TryMockVisible = showTryMock;
     }
 
     // ---------- 扫描 ----------
@@ -206,7 +199,6 @@ public partial class MainViewModel : ObservableObject
         ProgressText = "";
         DeviceStatusText = Strings.Status_Connecting;
         HintVisible = false;
-        TryMockVisible = false;
 
         try
         {
@@ -214,6 +206,33 @@ public partial class MainViewModel : ObservableObject
             var switchDevice = devices.FirstOrDefault(d => d.IsSwitch);
             if (switchDevice == null)
             {
+                // Switch 2 等非标准名称设备兜底：根目录含 Album 文件夹即视为 Switch
+                foreach (var device in devices.Where(d => !d.IsSwitch))
+                {
+                    try
+                    {
+                        var probeSession = await _provider.ConnectAsync(device, ct);
+                        await using (probeSession)
+                        {
+                            var root = await probeSession.EnumerateAsync("\\", ct);
+                            if (root.Any(e => e.IsDirectory && e.Name.Equals("Album", StringComparison.OrdinalIgnoreCase)))
+                            {
+                                switchDevice = device;
+                                Log.Info($"按 Album 目录兜底识别 Switch: {device.FriendlyName} ({device.DeviceId})");
+                                break;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Info($"兜底探测 {device.FriendlyName} 失败: {ex.Message}");
+                    }
+                }
+            }
+
+            if (switchDevice == null)
+            {
+                Log.Info("未找到 Switch 设备（含兜底探测），进入未连接状态");
                 await DisposeSessionAsync();
                 _scan = null;
                 await ShowDisconnectedAsync();
@@ -242,15 +261,15 @@ public partial class MainViewModel : ObservableObject
                 ShowWall = true;
                 HintVisible = _scan.Games.Count == 0;
                 HintText = Strings.Hint_EmptyAlbum;
-                TryMockVisible = false;
             }
         }
         catch (OperationCanceledException)
         {
             // 重新扫描打断，静默
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Error("扫描失败", ex);
             await DisposeSessionAsync();
             _scan = null;
             await ShowDisconnectedAsync();
@@ -610,15 +629,6 @@ public partial class MainViewModel : ObservableObject
                 ShowToast(Strings.Hint_MockMode);
             }
         }
-    }
-
-    [RelayCommand]
-    private async Task TryMockAsync()
-    {
-        _settings.Current.MockModeEnabled = true;
-        _settings.Save();
-        await SwitchProviderAsync();
-        ShowToast(Strings.Hint_MockMode);
     }
 
     [RelayCommand]

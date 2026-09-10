@@ -98,6 +98,22 @@ public sealed partial class SettingsViewModel : ObservableObject
     private async Task RefreshPhonesAsync() => await LoadPhonesAsync();
 
     [RelayCommand]
+    private void OpenLogs()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Log.DirectoryPath)
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch
+        {
+            // 打开失败忽略
+        }
+    }
+
+    [RelayCommand]
     private void RegenMockData()
     {
         DemoAlbumGenerator.Generate(_settings.Current.MockAlbumPath);

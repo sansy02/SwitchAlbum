@@ -27,7 +27,7 @@ public static class Strings
     public const string Btn_Back = "返回全部游戏";
     public const string Btn_SelectAll = "全选";
     public const string Btn_DeselectAll = "取消全选";
-    public const string Btn_TryMock = "体验模拟数据";
+    public const string Btn_OpenLogs = "打开日志文件夹";
     public const string Btn_OpenVideo = "打开播放";
 
     // 标签

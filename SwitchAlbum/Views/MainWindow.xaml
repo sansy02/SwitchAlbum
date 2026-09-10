@@ -94,11 +94,11 @@
             <!-- 空状态提示 -->
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="640"
                         Visibility="{Binding HintVisible, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="{Binding HintText}" TextWrapping="Wrap" TextAlignment="Center" FontSize="14"
-                           Foreground="{DynamicResource TextSecondaryBrush}" LineHeight="24"/>
-                <Button Content="{x:Static res:Strings.Btn_TryMock}" Command="{Binding TryMockCommand}"
-                        Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Center" Margin="0,20,0,0"
-                        Visibility="{Binding TryMockVisible, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock Text="{x:Static res:Strings.Status_NotConnected}" TextWrapping="Wrap" TextAlignment="Center"
+                           FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                <TextBlock Text="{Binding HintText}" TextWrapping="Wrap" TextAlignment="Center" FontSize="13"
+                           Foreground="{DynamicResource TextSecondaryBrush}" LineHeight="22" Margin="0,14,0,0"
+                           MaxWidth="560"/>
             </StackPanel>
 
             <!-- ============ 灯箱浮层 ============ -->

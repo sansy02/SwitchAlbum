@@ -30,6 +30,7 @@ public sealed class MtpMediaProvider : IMediaProvider, IDisposable
                 }
             }
 
+            Log.Info($"MTP 设备枚举: 共 {result.Count} 个 — " + string.Join(" | ", result.Select(d => d.FriendlyName)));
             return result;
         }, ct);
     }
@@ -39,10 +40,19 @@ public sealed class MtpMediaProvider : IMediaProvider, IDisposable
         return Task.Run<IMediaDeviceSession>(() =>
         {
             ct.ThrowIfCancellationRequested();
-            var device = EnumerateAllDevices()
-                .First(d => d.DeviceId.Equals(info.DeviceId, StringComparison.OrdinalIgnoreCase));
-            ConnectDevice(device);
-            return new MtpSession(device);
+            try
+            {
+                var device = EnumerateAllDevices()
+                    .First(d => d.DeviceId.Equals(info.DeviceId, StringComparison.OrdinalIgnoreCase));
+                ConnectDevice(device);
+                Log.Info($"已连接设备: {info.FriendlyName} ({info.DeviceId})");
+                return new MtpSession(device);
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"连接设备失败: {info.FriendlyName} ({info.DeviceId})", ex);
+                throw;
+            }
         }, ct);
     }
 
@@ -96,7 +106,10 @@ public sealed class MtpMediaProvider : IMediaProvider, IDisposable
             name = device.DeviceId;
         }
 
-        return new MediaDeviceInfo(device.DeviceId, name, name.Contains("switch", StringComparison.OrdinalIgnoreCase));
+        // Switch / Switch 2 / 其他任天堂设备都视为主机
+        var isSwitch = name.Contains("switch", StringComparison.OrdinalIgnoreCase)
+                       || name.Contains("nintendo", StringComparison.OrdinalIgnoreCase);
+        return new MediaDeviceInfo(device.DeviceId, name, isSwitch);
     }
 
     private static void ConnectDevice(MediaDevice device)
@@ -192,9 +205,10 @@ public sealed class MtpMediaProvider : IMediaProvider, IDisposable
                         result.Add(new MediaEntry(Path.GetFileName(dirPath), dirPath, true, 0, null));
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
                     // 某些设备的根目录枚举目录会失败，忽略
+                    Log.Info($"枚举目录失败（忽略）: {path} — {ex.Message}");
                 }
 
                 try
@@ -206,9 +220,9 @@ public sealed class MtpMediaProvider : IMediaProvider, IDisposable
                         result.Add(new MediaEntry(Path.GetFileName(filePath), filePath, false, 0, null));
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // 同上
+                    Log.Info($"枚举文件失败（忽略）: {path} — {ex.Message}");
                 }
 
                 return result;
