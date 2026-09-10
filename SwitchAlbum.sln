@@ -1,0 +1,39 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwitchAlbum", "SwitchAlbum\SwitchAlbum.csproj", "{D1322C0D-BC1A-45D9-9AE3-0E6C9BFE4B5C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwitchAlbum.TestsHarness", "SwitchAlbum.TestsHarness\SwitchAlbum.TestsHarness.csproj", "{6BAA632A-56CC-4D7E-9D3B-09A95213722E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{F9A862CC-8B3F-4B28-831C-DCF1EF120BA6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TitleDbGenerator", "tools\TitleDbGenerator\TitleDbGenerator.csproj", "{5DDCD407-267F-4053-A110-F0AB38C62C54}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D1322C0D-BC1A-45D9-9AE3-0E6C9BFE4B5C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1322C0D-BC1A-45D9-9AE3-0E6C9BFE4B5C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1322C0D-BC1A-45D9-9AE3-0E6C9BFE4B5C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1322C0D-BC1A-45D9-9AE3-0E6C9BFE4B5C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6BAA632A-56CC-4D7E-9D3B-09A95213722E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6BAA632A-56CC-4D7E-9D3B-09A95213722E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6BAA632A-56CC-4D7E-9D3B-09A95213722E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6BAA632A-56CC-4D7E-9D3B-09A95213722E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5DDCD407-267F-4053-A110-F0AB38C62C54}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5DDCD407-267F-4053-A110-F0AB38C62C54}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5DDCD407-267F-4053-A110-F0AB38C62C54}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5DDCD407-267F-4053-A110-F0AB38C62C54}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{5DDCD407-267F-4053-A110-F0AB38C62C54} = {F9A862CC-8B3F-4B28-831C-DCF1EF120BA6}
+	EndGlobalSection
+EndGlobal
