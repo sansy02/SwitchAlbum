@@ -17,6 +17,7 @@ public partial class MainViewModel : ObservableObject
     private readonly PhoneSaveService _phoneSaveService;
     private readonly ThumbnailService _thumbnailService;
     private readonly CoverService _coverService;
+    private readonly ScanCacheService _scanCache;
     private readonly ITitleDb? _titleDb;
     private readonly SynchronizationContext? _ui;
 
@@ -37,6 +38,7 @@ public partial class MainViewModel : ObservableObject
         PhoneSaveService phoneSaveService,
         ThumbnailService thumbnailService,
         CoverService coverService,
+        ScanCacheService scanCache,
         ITitleDb? titleDb)
     {
         _settings = settings;
@@ -46,6 +48,7 @@ public partial class MainViewModel : ObservableObject
         _phoneSaveService = phoneSaveService;
         _thumbnailService = thumbnailService;
         _coverService = coverService;
+        _scanCache = scanCache;
         _titleDb = titleDb;
         _ui = SynchronizationContext.Current;
 
@@ -220,23 +223,22 @@ public partial class MainViewModel : ObservableObject
             _deviceKey = switchDevice.DeviceId;
             IsDeviceConnected = true;
 
+            // 先显示本地扫描缓存（秒开），后台真实扫描刷新
+            var cached = _scanCache.Load(switchDevice.DeviceId);
+            if (cached != null)
+            {
+                ApplyScanResult(cached);
+                Log.Info("已加载扫描缓存（" + cached.Games.Count + " 个游戏），后台刷新中");
+            }
+
             DeviceStatusText = Strings.Status_Scanning;
             _scan = await AlbumScanner.ScanAsync(_session, _titleDb, ct);
             DeviceStatusText = switchDevice.FriendlyName;
 
             if (_scan != null)
             {
-                foreach (var item in _scan.AllItems)
-                {
-                    item.Saved = _tracker.GetState(item.GameTitle, item.FileName);
-                }
-
-                Wall = new GameWallViewModel(_scan, this);
-                Grid = null;
-                CloseLightbox();
-                ShowWall = true;
-                HintVisible = _scan.Games.Count == 0;
-                HintText = Strings.Hint_EmptyAlbum;
+                ApplyScanResult(_scan);
+                _scanCache.Save(switchDevice.DeviceId, _scan);
             }
         }
         catch (OperationCanceledException)
@@ -255,6 +257,23 @@ public partial class MainViewModel : ObservableObject
             IsScanning = false;
             ProgressIndeterminate = false;
         }
+    }
+
+    /// <summary>把扫描结果应用到界面（缓存与真实扫描共用）。</summary>
+    private void ApplyScanResult(ScanResult scan)
+    {
+        _scan = scan;
+        foreach (var item in scan.AllItems)
+        {
+            item.Saved = _tracker.GetState(item.GameTitle, item.FileName);
+        }
+
+        Wall = new GameWallViewModel(scan, this);
+        Grid = null;
+        CloseLightbox();
+        ShowWall = true;
+        HintVisible = scan.Games.Count == 0;
+        HintText = Strings.Hint_EmptyAlbum;
     }
 
     // ---------- 视图切换 ----------

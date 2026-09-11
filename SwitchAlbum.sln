@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TitleDbGenerator", "tools\T
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IconGenerator", "tools\IconGenerator\IconGenerator.csproj", "{0CC4F546-EFCA-4707-A488-8C0B931FC0C8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoverPackGenerator", "tools\CoverPackGenerator\CoverPackGenerator.csproj", "{6C86F3F3-95CB-4CEE-B4FB-4605D18BFE59}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -38,9 +40,14 @@ Global
 		{0CC4F546-EFCA-4707-A488-8C0B931FC0C8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0CC4F546-EFCA-4707-A488-8C0B931FC0C8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0CC4F546-EFCA-4707-A488-8C0B931FC0C8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6C86F3F3-95CB-4CEE-B4FB-4605D18BFE59}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6C86F3F3-95CB-4CEE-B4FB-4605D18BFE59}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6C86F3F3-95CB-4CEE-B4FB-4605D18BFE59}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6C86F3F3-95CB-4CEE-B4FB-4605D18BFE59}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{5DDCD407-267F-4053-A110-F0AB38C62C54} = {F9A862CC-8B3F-4B28-831C-DCF1EF120BA6}
 		{0CC4F546-EFCA-4707-A488-8C0B931FC0C8} = {F9A862CC-8B3F-4B28-831C-DCF1EF120BA6}
+		{6C86F3F3-95CB-4CEE-B4FB-4605D18BFE59} = {F9A862CC-8B3F-4B28-831C-DCF1EF120BA6}
 	EndGlobalSection
 EndGlobal

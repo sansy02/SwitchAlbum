@@ -11,7 +11,8 @@ public sealed class ThumbnailService
 {
     private readonly string _cacheDir;
     private readonly object _gate = new();
-    private readonly HashSet<string> _inFlight = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Task<string?>> _inFlight = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SemaphoreSlim _semaphore = new(2);
 
     public ThumbnailService(string? cacheDir = null)
     {
@@ -38,14 +39,38 @@ public sealed class ThumbnailService
             return cachePath;
         }
 
+        // 同 key 请求合并为同一个任务，避免重复下载
+        Task<string?> task;
         lock (_gate)
         {
-            if (!_inFlight.Add(key))
+            if (!_inFlight.TryGetValue(key, out task!))
             {
-                return cachePath; // 已有同 key 请求在途，返回占位（图片稍后由在途请求填好缓存）
+                task = FetchAsync(cachePath, session, devicePath, fileName, ct);
+                _inFlight[key] = task;
             }
         }
 
+        try
+        {
+            return await task.ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                if (_inFlight.TryGetValue(key, out var current) && ReferenceEquals(current, task))
+                {
+                    _inFlight.Remove(key);
+                }
+            }
+        }
+    }
+
+    private async Task<string?> FetchAsync(
+        string cachePath, IMediaDeviceSession session, string devicePath, string fileName, CancellationToken ct)
+    {
+        // MTP 单设备串行，限流 2 并发，避免几十个缩略图请求挤爆设备
+        await _semaphore.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             // 优先设备缩略图
@@ -91,10 +116,7 @@ public sealed class ThumbnailService
         }
         finally
         {
-            lock (_gate)
-            {
-                _inFlight.Remove(key);
-            }
+            _semaphore.Release();
         }
     }
 

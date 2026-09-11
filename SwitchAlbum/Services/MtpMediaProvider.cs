@@ -158,7 +158,7 @@ public sealed class MtpMediaProvider : IMediaProvider, IDisposable
                     _lastDeviceIds = snapshot.Select(d => d.DeviceId).ToHashSet(StringComparer.OrdinalIgnoreCase);
                     while (!ct.IsCancellationRequested)
                     {
-                        await Task.Delay(2500, ct).ConfigureAwait(false);
+                        await Task.Delay(5000, ct).ConfigureAwait(false);
                         var current = await GetDevicesAsync(ct).ConfigureAwait(false);
                         var ids = current.Select(d => d.DeviceId).ToHashSet(StringComparer.OrdinalIgnoreCase);
 

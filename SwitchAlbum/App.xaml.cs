@@ -39,7 +39,7 @@ public partial class App : Application
 
         var mainViewModel = new MainViewModel(
             _settings, _theme, tracker, saveService, phoneSaveService,
-            thumbnailService, coverService, TitleDbService.LoadEmbedded());
+            thumbnailService, coverService, new ScanCacheService(), TitleDbService.LoadEmbedded());
 
         var window = new MainWindow { DataContext = mainViewModel };
         mainViewModel.AttachWindow(window);

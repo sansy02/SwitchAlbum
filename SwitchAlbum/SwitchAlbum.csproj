@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>SwitchAlbum</RootNamespace>
     <AssemblyName>SwitchAlbum</AssemblyName>
-    <Version>1.0.3</Version>
+    <Version>1.0.4</Version>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
@@ -22,6 +22,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\titles.json" LogicalName="SwitchAlbum.Resources.titles.json" />
     <EmbeddedResource Include="Resources\TSCharacters.txt" LogicalName="SwitchAlbum.Resources.TSCharacters.txt" />
+    <EmbeddedResource Include="Resources\covers.zip" LogicalName="SwitchAlbum.Resources.covers.zip" Condition="Exists('Resources\covers.zip')" />
   </ItemGroup>
 
 </Project>

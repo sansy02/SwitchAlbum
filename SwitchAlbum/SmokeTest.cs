@@ -73,6 +73,14 @@ public static class SmokeTest
                 var cover = await coverService.ResolveAsync(tid, "塞尔达传说 王国之泪", urls, CancellationToken.None);
                 lines.Add($"cover tid={tid} urls={(urls?.Count ?? 0)} path={cover}");
                 ok &= tid == "0100F2C0115B6000" && cover != null && File.Exists(cover);
+                if (cover != null && File.Exists(cover))
+                {
+                    // 内置封面包为 256px 降采样图，尺寸 ≤256 说明命中离线包而非网络源
+                    using var image = System.Drawing.Image.FromFile(cover);
+                    var fromBundle = image.Width <= 256;
+                    lines.Add($"cover 尺寸={image.Width}x{image.Height} 来自内置包={fromBundle}");
+                    ok &= fromBundle;
+                }
             }
             catch (Exception ex)
             {
