@@ -29,6 +29,7 @@ public partial class MainViewModel : ObservableObject
     private Window? _owner;
     private string? _deviceKey;
     private int _toastSequence;
+    private int _transferGeneration;
 
     public MainViewModel(
         SettingsService settings,
@@ -425,13 +426,19 @@ public partial class MainViewModel : ObservableObject
 
         _transferCts = new CancellationTokenSource();
         var ct = _transferCts.Token;
+        var generation = ++_transferGeneration;
         IsTransferring = true;
         ProgressValue = 0;
         ProgressIndeterminate = false;
 
         var result = await _saveService.SaveToPcAsync(
             items, _session, targetDir, _settings.Current.AutoRename,
-            new Progress<SaveProgress>(p => ReportSaveProgress(p, toPhone: false)), ct);
+            new Progress<SaveProgress>(p => ReportSaveProgress(p, toPhone: false, generation)), ct);
+
+        RefreshSavedStates();
+        IsTransferring = false;
+        _transferCts = null;
+        SetSaveOutcomeText(result, toPhone: false, items.Count);
 
         if (result.Cancelled)
         {
@@ -445,10 +452,6 @@ public partial class MainViewModel : ObservableObject
         {
             ShowToast(string.Format(Strings.Status_SavedDone, result.SavedCount, result.SkippedCount, result.Failed.Count));
         }
-
-        RefreshSavedStates();
-        IsTransferring = false;
-        _transferCts = null;
     }
 
     // ---------- 保存到手机 ----------
@@ -486,6 +489,7 @@ public partial class MainViewModel : ObservableObject
 
         _transferCts = new CancellationTokenSource();
         var ct = _transferCts.Token;
+        var generation = ++_transferGeneration;
         IsTransferring = true;
         ProgressValue = 0;
         ProgressIndeterminate = false;
@@ -502,7 +506,12 @@ public partial class MainViewModel : ObservableObject
         {
             var result = await _phoneSaveService.SaveToPhoneAsync(
                 items, _session, phone, _settings.Current.AutoRename,
-                new Progress<SaveProgress>(p => ReportSaveProgress(p, toPhone: true)), ct);
+                new Progress<SaveProgress>(p => ReportSaveProgress(p, toPhone: true, generation)), ct);
+
+            RefreshSavedStates();
+            IsTransferring = false;
+            _transferCts = null;
+            SetSaveOutcomeText(result, toPhone: true, items.Count);
 
             if (result.Cancelled)
             {
@@ -516,12 +525,7 @@ public partial class MainViewModel : ObservableObject
             {
                 ShowToast(string.Format(Strings.Status_PhoneDone, result.SavedCount, result.SkippedCount));
             }
-
-            RefreshSavedStates();
         }
-
-        IsTransferring = false;
-        _transferCts = null;
     }
 
     private async Task<IMediaDeviceSession?> ResolvePhoneSessionAsync(CancellationToken ct)
@@ -621,12 +625,44 @@ public partial class MainViewModel : ObservableObject
     private void CancelTransfer() => _transferCts?.Cancel();
 
     // ---------- 内部 ----------
-    private void ReportSaveProgress(SaveProgress p, bool toPhone)
+    private void ReportSaveProgress(SaveProgress p, bool toPhone, int generation)
     {
+        // 进度回调经 dispatcher 异步投递，可能在传输已结束后才到达；
+        // 此时若仍写 ProgressText，会把完成文字刷回「正在保存 0/N」。按代次丢弃滞后回调。
+        if (!IsTransferring || generation != _transferGeneration)
+        {
+            return;
+        }
+
         ProgressText = toPhone
             ? string.Format(Strings.Status_PhoneProgress, p.Done, p.Total, Path.GetFileName(p.CurrentFileName ?? ""))
             : string.Format(Strings.Status_Progress, p.Done, p.Total, Path.GetFileName(p.CurrentFileName ?? ""));
         ProgressValue = p.Total == 0 ? 0 : p.Done * 100.0 / p.Total;
+    }
+
+    /// <summary>传输结束后，把结果写到状态栏进度文字所在位置（toast 自动消失，这里留下持久反馈）。</summary>
+    private void SetSaveOutcomeText(SaveResult result, bool toPhone, int total)
+    {
+        if (result.Cancelled)
+        {
+            ProgressText = string.Format(Strings.Status_SavedPartial, result.SavedCount, total);
+        }
+        else if (result.SavedCount == 0 && result.Failed.Count > 0)
+        {
+            ProgressText = Strings.Status_SaveFailedShort;
+        }
+        else if (result.SavedCount == 0 && result.SkippedCount > 0)
+        {
+            ProgressText = Strings.Status_AllSkipped;
+        }
+        else
+        {
+            ProgressText = toPhone
+                ? string.Format(Strings.Status_PhoneSuccessCount, result.SavedCount)
+                : string.Format(Strings.Status_SaveSuccessCount, result.SavedCount);
+        }
+
+        ProgressValue = 100;
     }
 
     private void RefreshSavedStates()

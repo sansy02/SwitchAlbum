@@ -56,6 +56,12 @@ public static class Strings
     public const string Msg_PathInvalid = "保存路径不可用，请重新选择";
     public const string Msg_SaveFailed = "保存失败：{0}";
 
+    // 完成后停留在状态栏同一位置的反馈文案
+    public const string Status_SaveSuccessCount = "保存成功 · 已保存 {0} 个";
+    public const string Status_PhoneSuccessCount = "已保存到手机 · {0} 个";
+    public const string Status_AllSkipped = "所选项目均已保存过，无需重复保存";
+    public const string Status_SaveFailedShort = "保存失败";
+
     // 设置
     public const string Dlg_Settings_Title = "设置";
     public const string Settings_Theme = "主题";

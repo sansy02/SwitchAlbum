@@ -65,6 +65,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         _ => AppTheme.System,
     };
 
+    /// <summary>主题选择即时生效：不必等关闭对话框才变色。</summary>
+    partial void OnThemeOptionChanged(string value) => _theme.SetTheme(MapToTheme(value));
+
     public void SetSavePath(string path)
     {
         if (!string.IsNullOrWhiteSpace(path))
