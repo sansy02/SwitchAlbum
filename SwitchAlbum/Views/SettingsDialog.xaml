@@ -28,6 +28,8 @@
 
         <!-- 自动重命名 -->
         <CheckBox Content="{x:Static res:Strings.Settings_AutoRename}" IsChecked="{Binding AutoRename}"/>
+        <TextBlock Text="{x:Static res:Strings.Settings_AutoRenameExample}" FontSize="11.5"
+                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="26,5,0,0"/>
 
         <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,18"/>
 
@@ -55,15 +57,19 @@
                     Style="{StaticResource SubtleButtonStyle}" Margin="10,0,0,0" Padding="12,6" FontSize="12"/>
         </Grid>
 
-        <!-- API 密钥 -->
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="160"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="{x:Static res:Strings.Settings_ApiKey}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,0"/>
-            <TextBox Grid.Column="1" Text="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}"/>
-        </Grid>
+        <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,18"/>
+
+        <!-- 数据管理 -->
+        <StackPanel Orientation="Horizontal">
+            <Button Content="{x:Static res:Strings.Btn_OpenSaveFolder}" Command="{Binding OpenSaveFolderCommand}"
+                    Style="{StaticResource SubtleButtonStyle}" Padding="12,6" FontSize="12"/>
+            <Button Content="{x:Static res:Strings.Btn_ClearCache}" Command="{Binding ClearCacheCommand}"
+                    Style="{StaticResource SubtleButtonStyle}" Padding="12,6" FontSize="12" Margin="10,0,0,0"/>
+            <TextBlock Text="{Binding CacheSizeText}" VerticalAlignment="Center" Margin="12,0,0,0" FontSize="11.5"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+            <TextBlock Text="{Binding CacheStatus}" VerticalAlignment="Center" Margin="12,0,0,0" FontSize="11.5"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+        </StackPanel>
 
         <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,18"/>
 

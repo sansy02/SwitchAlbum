@@ -32,15 +32,16 @@ public sealed partial class SettingsViewModel : ObservableObject
         _savePath = settings.Current.SavePath;
         _autoRename = settings.Current.AutoRename;
         _themeOption = MapToOption(theme.Theme);
-        _apiKey = settings.Current.SteamGridDbApiKey ?? "";
         _ = LoadPhonesAsync();
+        _ = LoadCacheSizeAsync();
     }
 
     [ObservableProperty] private string _savePath;
     [ObservableProperty] private bool _autoRename;
     [ObservableProperty] private string _themeOption;
-    [ObservableProperty] private string _apiKey;
     [ObservableProperty] private PhoneOption? _selectedPhone;
+    [ObservableProperty] private string _cacheStatus = "";
+    [ObservableProperty] private string _cacheSizeText = "";
 
     public ObservableCollection<PhoneOption> Phones { get; } = new();
 
@@ -80,7 +81,6 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         _settings.Current.SavePath = SavePath;
         _settings.Current.AutoRename = AutoRename;
-        _settings.Current.SteamGridDbApiKey = string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey.Trim();
 
         _settings.Current.PhoneDeviceId = SelectedPhone?.Id;
         _settings.Current.PhoneFriendlyName = SelectedPhone?.Name;
@@ -108,13 +108,114 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
     }
 
+    [RelayCommand]
+    private void OpenSaveFolder()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_settings.Current.SavePath)
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch
+        {
+            // 打开失败忽略
+        }
+    }
+
+    [RelayCommand]
+    private void ClearCache()
+    {
+        var baseDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SwitchAlbum");
+        long freed = 0;
+        foreach (var sub in new[] { "covers", "thumbs" })
+        {
+            try
+            {
+                var dir = Path.Combine(baseDir, sub);
+                if (Directory.Exists(dir))
+                {
+                    freed += DirSize(dir);
+                    Directory.Delete(dir, recursive: true);
+                }
+            }
+            catch
+            {
+                // 文件被占用时忽略
+            }
+        }
+
+        CacheStatus = string.Format(Strings.Status_CacheClearedWithSize, FormatSize(freed));
+        _ = LoadCacheSizeAsync();
+    }
+
+    private async Task LoadCacheSizeAsync()
+    {
+        var baseDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SwitchAlbum");
+        var total = await Task.Run(() =>
+        {
+            long sum = 0;
+            foreach (var sub in new[] { "covers", "thumbs" })
+            {
+                try
+                {
+                    var dir = Path.Combine(baseDir, sub);
+                    if (Directory.Exists(dir))
+                    {
+                        sum += DirSize(dir);
+                    }
+                }
+                catch
+                {
+                    // 忽略统计失败
+                }
+            }
+
+            return sum;
+        });
+
+        CacheSizeText = total > 0
+            ? string.Format(Strings.Settings_CacheSize, FormatSize(total))
+            : Strings.Settings_CacheSizeNone;
+    }
+
+    private static long DirSize(string dir)
+    {
+        long sum = 0;
+        foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+        {
+            try
+            {
+                sum += new FileInfo(file).Length;
+            }
+            catch
+            {
+                // 忽略单文件失败
+            }
+        }
+
+        return sum;
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1024 * 1024 * 1024 => $"{bytes / 1024.0 / 1024.0 / 1024.0:F2} GB",
+        >= 1024 * 1024 => $"{bytes / 1024.0 / 1024.0:F1} MB",
+        >= 1024 => $"{bytes / 1024.0:F0} KB",
+        _ => $"{bytes} B",
+    };
+
     private async Task LoadPhonesAsync()
     {
         Phones.Clear();
         Phones.Add(new PhoneOption(null, Strings.Settings_PhoneDevice_Auto));
 
-        var devices = await _provider.GetDevicesAsync(CancellationToken.None);
-        foreach (var device in devices.Where(d => !d.IsSwitch))
+        // 仅 MTP 协议设备（安卓手机）；硬盘（MSC）等不会出现在列表里
+        var devices = await _provider.GetPhoneCandidateDevicesAsync(CancellationToken.None);
+        foreach (var device in devices)
         {
             Phones.Add(new PhoneOption(device.DeviceId, device.FriendlyName));
         }

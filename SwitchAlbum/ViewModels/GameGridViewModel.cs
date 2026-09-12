@@ -13,7 +13,7 @@ public enum GridSortMode
 }
 
 /// <summary>单个游戏（或全部）的照片网格。行分块 + ListBox 虚拟化，支持按拍摄时间排序。</summary>
-public sealed partial class GameGridViewModel : ObservableObject
+public partial class GameGridViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
     private readonly List<PhotoItemViewModel> _items;

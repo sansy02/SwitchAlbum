@@ -40,9 +40,12 @@ public static class SmokeTest
             lines.Add($"pc-save saved={pcResult.SavedCount} skipped={pcResult.SkippedCount} failed={pcResult.Failed.Count} cancelled={pcResult.Cancelled}");
             ok &= pcResult.SavedCount == scan.AllItems.Count && pcResult.Failed.Count == 0;
 
-            var pcFiles = Directory.GetFiles(settings.Current.SavePath).Length;
+            // 按游戏分文件夹：所有文件位于 保存目录\游戏名\ 下
+            var pcFiles = Directory.GetFiles(settings.Current.SavePath, "*", SearchOption.AllDirectories).Length;
             lines.Add($"pc-files={pcFiles}");
             ok &= pcFiles == scan.AllItems.Count;
+            var pcGameDirs = Directory.GetDirectories(settings.Current.SavePath).Select(Path.GetFileName).ToArray();
+            ok &= pcGameDirs.Contains("塞尔达传说 王国之泪");
 
             await using var phoneSession = await provider.ConnectAsync(devices.Single(d => !d.IsSwitch), CancellationToken.None);
             var phoneResult = await phoneSaveService.SaveToPhoneAsync(
@@ -56,6 +59,7 @@ public static class SmokeTest
                 : 0;
             lines.Add($"phone-files={phoneFiles}");
             ok &= phoneFiles == scan.AllItems.Count;
+            ok &= Directory.Exists(Path.Combine(phoneDcim, "塞尔达传说 王国之泪"));   // 手机端按游戏分文件夹
 
             // 二次保存应全部跳过
             var again = await saveService.SaveToPcAsync(
@@ -63,10 +67,29 @@ public static class SmokeTest
             lines.Add($"pc-resave skipped={again.SkippedCount}");
             ok &= again.SkippedCount == scan.AllItems.Count && again.SavedCount == 0;
 
-            // 封面链路：名称反查 → 官方直链（图标/横幅）→ 本地缓存
+            // 本地相册页流程：本地目录会话扫描电脑保存目录 → 保存到手机
+            await using var localSession = new LocalFolderSession(settings.Current.SavePath);
+            var localScan = await AlbumScanner.ScanAsync(localSession, null, CancellationToken.None);
+            lines.Add($"local-scan games={(localScan?.Games.Count ?? 0)} items={(localScan?.AllItems.Count ?? 0)}");
+            ok &= localScan != null && localScan.AllItems.Count == scan.AllItems.Count;
+            if (localScan != null)
+            {
+                var localSave = await phoneSaveService.SaveToPhoneAsync(
+                    localScan.AllItems, localSession, phoneSession, autoRename: true, null, CancellationToken.None);
+                lines.Add($"local-phone saved={localSave.SavedCount} failed={localSave.Failed.Count}");
+                ok &= localSave.SavedCount == localScan.AllItems.Count;
+                // 电脑文件与 Switch 原文件去重键不同，手机端出现两套副本（已知边界）
+                var phoneFiles2 = Directory.Exists(phoneDcim)
+                    ? Directory.GetFiles(phoneDcim, "*", SearchOption.AllDirectories).Length
+                    : 0;
+                lines.Add($"phone-files-after-local={phoneFiles2}");
+                ok &= phoneFiles2 == scan.AllItems.Count * 2;
+            }
+
+            // 封面链路：Switch 2 风格文件夹名模糊反查 → 内置封面包
             var titleDb = TitleDbService.LoadEmbedded();
-            var tid = titleDb?.GetTitleIdByName("塞尔达传说 王国之泪");
-            var coverService = new CoverService(settings, Path.Combine(root, "covers"));
+            var tid = titleDb?.GetTitleIdByFolderName("塞尔达传说 王国之泪 Nintendo Switch 2 Edition");
+            var coverService = new CoverService(Path.Combine(root, "covers"));
             try
             {
                 var urls = tid != null ? titleDb?.GetCoverUrls(tid) : null;

@@ -187,6 +187,68 @@ Add("标题库: 繁体名注册简体变体（含品牌别名）", () =>
         && db.GetTitleIdByName("塞尔达传说 旷野之息") == "01007EF00011E000";
 });
 
+// ---------- 标题库: 文件夹名模糊反查（合成库，确定性） ----------
+static TitleDbService SyntheticDb()
+{
+    var json = """
+    {
+      "0100AAAA00000001": { "zh": "塞尔达传说 王国之泪", "en": "The Legend of Zelda: Tears of the Kingdom" },
+      "0100AAAA00000002": { "zh": "超级马力欧兄弟 惊奇" },
+      "0100AAAA00000003": { "en": "Splatoon 3" },
+      "0100AAAA00000004": { "zht": "霍格華茲的傳承" },
+      "0100AAAA00000005": { "ja": "ゼノブレイド２" },
+      "0100AAAA00000006": { "zh": "神之天平 Revision" }
+    }
+    """;
+    var t2s = "華\t华\n茲\t兹\n傳\t传\n承\t承\n";
+    using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(json));
+    using var t2sStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(t2s));
+    return new TitleDbService(stream, t2sStream);
+}
+
+Add("模糊反查: Switch 2 后缀剥离", () =>
+{
+    var db = SyntheticDb();
+    return db.GetTitleIdByFolderName("塞尔达传说 王国之泪 Nintendo Switch 2 Edition") == "0100AAAA00000001"
+        && db.GetTitleIdByFolderName("塞尔达传说 王国之泪 體驗版") == "0100AAAA00000001"
+        && db.GetTitleIdByFolderName("塞尔达传说 王国之泪 DEMO") == "0100AAAA00000001";
+});
+Add("模糊反查: 括号注释剥离", () =>
+{
+    var db = SyntheticDb();
+    return db.GetTitleIdByFolderName("Splatoon 3（斯普拉遁 3）") == "0100AAAA00000003"
+        && db.GetTitleIdByFolderName("Splatoon 3 (スプラトゥーン3)") == "0100AAAA00000003";
+});
+Add("模糊反查: 包含匹配（后缀+捆绑）", () =>
+{
+    var db = SyntheticDb();
+    return db.GetTitleIdByFolderName("超级马力欧兄弟 惊奇 Nintendo Switch 2 Edition + 同游铃铃公园") == "0100AAAA00000002"
+        && db.GetTitleIdByFolderName("神之天平") == "0100AAAA00000006";
+});
+Add("模糊反查: 品牌别名（繁体霍格華茲→霍格沃茨之遗）", () =>
+{
+    var db = SyntheticDb();
+    return db.GetTitleIdByFolderName("霍格沃茨之遗") == "0100AAAA00000004";
+});
+Add("模糊反查: 日文名注册与全角数字", () =>
+{
+    var db = SyntheticDb();
+    return db.GetTitleIdByFolderName("ゼノブレイド2") == "0100AAAA00000005";
+});
+Add("模糊反查: 真实库 Switch 2 风格文件夹名", () =>
+{
+    var db = TitleDbService.LoadEmbedded();
+    return db?.GetTitleIdByFolderName("塞尔达传说 王国之泪 Nintendo Switch 2 Edition") == "0100F2C0115B6000"
+        && db.GetTitleIdByFolderName("塞尔达传说 旷野之息 Nintendo Switch 2 Edition") == "01007EF00011E000";
+});
+Add("模糊反查: 真实库日文文件夹名", () =>
+{
+    var db = TitleDbService.LoadEmbedded();
+    // titles.json 已合并 titledb JP.ja 日文名
+    var xb2 = db?.GetTitleIdByFolderName("ゼノブレイド２");
+    return xb2 is { Length: 16 } && xb2.All(Uri.IsHexDigit);
+});
+
 // ---------- 集成: 模拟设备扫描 ----------
 AddAsync("模拟: 扫描相册结构", async () =>
 {
@@ -216,7 +278,7 @@ AddAsync("模拟: 扫描相册结构", async () =>
 });
 
 // ---------- 集成: 保存到电脑 + 重复跳过 ----------
-AddAsync("模拟: 保存到电脑并跳过重复", async () =>
+AddAsync("模拟: 保存到电脑按游戏分文件夹并跳过重复", async () =>
 {
     var root = TempDir();
     try
@@ -235,7 +297,7 @@ AddAsync("模拟: 保存到电脑并跳过重复", async () =>
         }
 
         var r1 = await save.SaveToPcAsync(scan.AllItems, session, outDir, autoRename: true, null, default);
-        var files = Directory.GetFiles(outDir);
+        var files = Directory.GetFiles(outDir, "*", SearchOption.AllDirectories);
         var namesOk = files.All(f =>
         {
             var n = Path.GetFileName(f);
@@ -243,12 +305,104 @@ AddAsync("模拟: 保存到电脑并跳过重复", async () =>
         });
         var firstOk = r1.SavedCount == scan.AllItems.Count && r1.SkippedCount == 0 && r1.Failed.Count == 0;
         var videoOk = files.Any(f => f.EndsWith(".mp4"));
-        var legacyOk = files.Any(f => f.Contains("未知游戏 (0100F2C0…)") || f.Contains("0100F2C0"));
+
+        // 每个文件都位于以其游戏名命名的子文件夹内
+        var subdirOk = files.All(f =>
+        {
+            var dirName = Path.GetFileName(Path.GetDirectoryName(f)!)!;
+            return dirName != "out" && Directory.Exists(Path.Combine(outDir, dirName));
+        });
+        var gameDirs = Directory.GetDirectories(outDir).Select(Path.GetFileName).ToArray();
+        var totkOk = gameDirs.Contains("塞尔达传说 王国之泪");
 
         var r2 = await save.SaveToPcAsync(scan.AllItems, session, outDir, autoRename: true, null, default);
         var skipOk = r2.SkippedCount == scan.AllItems.Count && r2.SavedCount == 0;
 
-        return namesOk && firstOk && videoOk && skipOk;
+        return namesOk && firstOk && videoOk && subdirOk && totkOk && skipOk;
+    }
+    finally { Directory.Delete(root, recursive: true); }
+});
+
+// ---------- 集成: 保存到手机按游戏分文件夹 ----------
+AddAsync("模拟: 保存到手机按游戏分文件夹", async () =>
+{
+    var root = TempDir();
+    try
+    {
+        DemoAlbumGenerator.Generate(root);
+        var provider = new MockMediaProvider(root, Path.Combine(root, "phone"));
+        var tracker = new DuplicateTracker(Path.Combine(root, "saved.json"));
+        var settings = new SettingsService(Path.Combine(root, "settings.json"));
+        var phoneSave = new PhoneSaveService(tracker, settings);
+        var devices = await provider.GetDevicesAsync(default);
+        await using var switchSession = await provider.ConnectAsync(devices.Single(d => d.IsSwitch), default);
+        await using var phoneSession = await provider.ConnectAsync(devices.Single(d => !d.IsSwitch), default);
+        var scan = await AlbumScanner.ScanAsync(switchSession, null, default);
+        if (scan == null)
+        {
+            return false;
+        }
+
+        var r = await phoneSave.SaveToPhoneAsync(
+            scan.AllItems, switchSession, phoneSession, autoRename: true, null, default);
+        var dcim = Path.Combine(root, "phone", "Internal shared storage", "DCIM", "SwitchAlbum");
+        var dirs = Directory.Exists(dcim) ? Directory.GetDirectories(dcim).Select(Path.GetFileName).ToArray() : Array.Empty<string?>();
+        var files = Directory.Exists(dcim) ? Directory.GetFiles(dcim, "*", SearchOption.AllDirectories) : Array.Empty<string>();
+
+        return r.SavedCount == scan.AllItems.Count
+            && dirs.Contains("塞尔达传说 王国之泪")
+            && !dirs.Any(d => d is { Length: 10 } && d.Contains('-'))   // 不再按日期建目录
+            && files.Length == scan.AllItems.Count;
+    }
+    finally { Directory.Delete(root, recursive: true); }
+});
+
+// ---------- 集成: 本地相册页扫描 → 保存到手机 ----------
+AddAsync("模拟: 本地目录扫描并保存到手机（本地相册页流程）", async () =>
+{
+    var root = TempDir();
+    try
+    {
+        DemoAlbumGenerator.Generate(root);
+        var outDir = Path.Combine(root, "out");
+        var provider = new MockMediaProvider(root, Path.Combine(root, "phone"));
+        var tracker = new DuplicateTracker(Path.Combine(root, "saved.json"));
+        var settings = new SettingsService(Path.Combine(root, "settings.json"));
+        var save = new SaveService(tracker);
+        var phoneSave = new PhoneSaveService(tracker, settings);
+        var devices = await provider.GetDevicesAsync(default);
+
+        // 第一步：Switch → 电脑（分游戏文件夹）
+        await using (var switchSession = await provider.ConnectAsync(devices.Single(d => d.IsSwitch), default))
+        {
+            var scan = await AlbumScanner.ScanAsync(switchSession, null, default);
+            if (scan == null)
+            {
+                return false;
+            }
+
+            var r = await save.SaveToPcAsync(scan.AllItems, switchSession, outDir, autoRename: true, null, default);
+            if (r.SavedCount != scan.AllItems.Count)
+            {
+                return false;
+            }
+        }
+
+        // 第二步：本地目录会话扫描电脑保存目录（与本地相册页同一路径）
+        await using var localSession = new LocalFolderSession(outDir);
+        var localScan = await AlbumScanner.ScanAsync(localSession, null, default);
+        var scanOk = localScan != null
+            && localScan.AllItems.Count == Directory.GetFiles(outDir, "*", SearchOption.AllDirectories).Length
+            && localScan.Games.Any(g => g.Title == "塞尔达传说 王国之泪");
+
+        // 第三步：本地 → 手机
+        await using var phoneSession = await provider.ConnectAsync(devices.Single(d => !d.IsSwitch), default);
+        var r2 = await phoneSave.SaveToPhoneAsync(
+            localScan!.AllItems, localSession, phoneSession, autoRename: true, null, default);
+        var dcim = Path.Combine(root, "phone", "Internal shared storage", "DCIM", "SwitchAlbum");
+        var gameDirOk = Directory.Exists(Path.Combine(dcim, "塞尔达传说 王国之泪"));
+
+        return scanOk && r2.SavedCount == localScan.AllItems.Count && gameDirOk;
     }
     finally { Directory.Delete(root, recursive: true); }
 });

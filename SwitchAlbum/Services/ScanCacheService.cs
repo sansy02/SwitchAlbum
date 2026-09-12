@@ -9,6 +9,9 @@ namespace SwitchAlbum.Services;
 /// </summary>
 public sealed class ScanCacheService
 {
+    /// <summary>缓存结构版本：解析逻辑变更（如模糊名称反查）后递增，旧缓存直接失效。</summary>
+    private const int SchemaVersion = 2;
+
     private readonly string _dir;
 
     public ScanCacheService(string? dir = null)
@@ -26,6 +29,7 @@ public sealed class ScanCacheService
             var dto = new ScanCacheDto
             {
                 DeviceId = deviceId,
+                Version = SchemaVersion,
                 Games = scan.Games.Select(g => new GameDto
                 {
                     Title = g.Title,
@@ -66,7 +70,7 @@ public sealed class ScanCacheService
             }
 
             var dto = JsonSerializer.Deserialize<ScanCacheDto>(File.ReadAllText(path));
-            if (dto == null || dto.Games.Count == 0)
+            if (dto == null || dto.Games.Count == 0 || dto.Version != SchemaVersion)
             {
                 return null;
             }
@@ -121,6 +125,7 @@ public sealed class ScanCacheService
 
     private sealed class ScanCacheDto
     {
+        public int Version { get; set; }
         public string DeviceId { get; set; } = "";
         public List<GameDto> Games { get; set; } = new();
         public List<ItemDto> Items { get; set; } = new();

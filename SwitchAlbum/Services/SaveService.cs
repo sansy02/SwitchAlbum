@@ -1,4 +1,5 @@
 using SwitchAlbum.Models;
+using SwitchAlbum.Services.Parsing;
 
 namespace SwitchAlbum.Services;
 
@@ -48,8 +49,45 @@ public sealed class SaveService
         var pending = items.Where(i => !HasSavedToPc(i)).ToList();
         var skipped = items.Count - pending.Count;
 
-        var existingNames = SafeEnumerateFileNames(targetDir);
-        var plan = RenamePlanner.Plan(pending, existingNames, autoRename);
+        // 按游戏分文件夹：保存位置\游戏名\文件，目录名经清理
+        var dirOf = new Dictionary<AlbumItem, string>();
+        var existingNamesByDir = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in pending.GroupBy(i => i.GameTitle))
+        {
+            var dir = Path.Combine(targetDir, FileNameSanitizer.Sanitize(group.Key));
+            foreach (var item in group)
+            {
+                dirOf[item] = dir;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(dir);
+                existingNamesByDir[dir] = SafeEnumerateFileNames(dir);
+            }
+            catch
+            {
+                foreach (var item in group)
+                {
+                    dirOf.Remove(item);
+                }
+            }
+        }
+
+        var plan = new Dictionary<AlbumItem, string>();
+        foreach (var group in pending.GroupBy(i => dirOf.TryGetValue(i, out var dir) ? dir : null))
+        {
+            if (group.Key == null)
+            {
+                continue;
+            }
+
+            existingNamesByDir.TryGetValue(group.Key, out var existing);
+            foreach (var (item, name) in RenamePlanner.Plan(group.ToList(), existing, autoRename))
+            {
+                plan[item] = name;
+            }
+        }
 
         var failures = new List<(AlbumItem Item, string Error)>();
         var done = 0;
@@ -61,7 +99,19 @@ public sealed class SaveService
         {
             ct.ThrowIfCancellationRequested();
 
-            var finalPath = Path.Combine(targetDir, plan[item]);
+            if (!dirOf.TryGetValue(item, out var dir) || !plan.TryGetValue(item, out var name))
+            {
+                lock (_gate)
+                {
+                    failures.Add((item, "目录不可用"));
+                    done++;
+                }
+
+                progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName));
+                return;
+            }
+
+            var finalPath = Path.Combine(dir, name);
             var tmpPath = finalPath + ".part";
             try
             {

@@ -23,10 +23,37 @@ public sealed class TitleDbService : ITitleDb
         ("玛利欧赛车", "马力欧卡丁车"),
         ("大金刚", "咚奇刚"),
         ("路易吉洋楼", "路易吉洋馆"),
+        ("霍格华兹", "霍格沃茨"),
+        ("霍格沃茨的传承", "霍格沃茨之遗"),
+        ("霍格華茲", "霍格沃茨"),
+    };
+
+    /// <summary>文件夹名常见后缀（已规范化、按长度降序），反查时逐个剥离。</summary>
+    private static readonly string[] FolderNameSuffixes =
+    {
+        "nintendoswitch2edition",
+        "nintendoswitchedition",
+        "switch2edition",
+        "nintendoswitch2",
+        "definitiveedition",
+        "ultimateedition",
+        "completeedition",
+        "specialedition",
+        "deluxeedition",
+        "goldedition",
+        "体验版",
+        "體驗版",
+        "体験版",
+        "試玩版",
+        "试玩版",
+        "特別版",
+        "特别版",
+        "demo",
     };
 
     private readonly Dictionary<string, TitleNames> _byId = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _byName = new(StringComparer.Ordinal);
+    private readonly (string Name, string Tid)[] _byNameEntries;
     private readonly Dictionary<string, string[]> _coverUrls = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<char, string> _t2sChar = new();
     private readonly List<(string Key, string Value)> _t2sMulti = new();
@@ -57,7 +84,8 @@ public sealed class TitleDbService : ITitleDb
         {
             var tid = property.Name;
             var value = property.Value;
-            var names = new TitleNames(GetString(value, "zh"), GetString(value, "zht"), GetString(value, "en"));
+            var names = new TitleNames(
+                GetString(value, "zh"), GetString(value, "zht"), GetString(value, "en"), GetString(value, "ja"));
             if (names.Best == null)
             {
                 continue;
@@ -77,7 +105,14 @@ public sealed class TitleDbService : ITitleDb
             RegisterName(names.Zh, tid);
             RegisterName(names.ZhHant, tid);
             RegisterName(names.En, tid);
+            RegisterName(names.Ja, tid);
         }
+
+        // 包含匹配按名称长度降序尝试：最长命中最具体（如「马力欧卡丁车8 豪华版」优先于「马力欧卡丁车8」）
+        _byNameEntries = _byName
+            .Select(kv => (Name: kv.Key, Tid: kv.Value))
+            .OrderByDescending(e => e.Name.Length)
+            .ToArray();
     }
 
     public string? GetNameByTitleId(string titleId)
@@ -85,6 +120,135 @@ public sealed class TitleDbService : ITitleDb
 
     public string? GetTitleIdByName(string titleName)
         => _byName.TryGetValue(Normalize(titleName), out var tid) ? tid : null;
+
+    public string? GetTitleIdByFolderName(string folderName)
+    {
+        if (string.IsNullOrWhiteSpace(folderName))
+        {
+            return null;
+        }
+
+        // 1. 规范化精确匹配（含繁体文件夹经繁→简后精确匹配）
+        foreach (var candidate in NormalizeCandidates(folderName))
+        {
+            if (_byName.TryGetValue(candidate, out var tid))
+            {
+                return tid;
+            }
+        }
+
+        // 2. 剥离常见后缀后精确匹配（在规范化串上剥离，规范化是幂等的）
+        var nameNorm = Normalize(folderName);
+        foreach (var suffix in FolderNameSuffixes)
+        {
+            if (!nameNorm.EndsWith(suffix, StringComparison.Ordinal) || nameNorm.Length <= suffix.Length)
+            {
+                continue;
+            }
+
+            var baseNorm = nameNorm[..(nameNorm.Length - suffix.Length)];
+            foreach (var candidate in NormalizeCandidates(baseNorm))
+            {
+                if (_byName.TryGetValue(candidate, out var tid))
+                {
+                    return tid;
+                }
+            }
+        }
+
+        // 3. 剥离尾部括号注释（如「Splatoon 3（斯普拉遁 3）」）后精确匹配
+        var withoutParen = StripTrailingParenthetical(folderName);
+        if (withoutParen != folderName)
+        {
+            foreach (var candidate in NormalizeCandidates(withoutParen))
+            {
+                if (_byName.TryGetValue(candidate, out var tid))
+                {
+                    return tid;
+                }
+            }
+        }
+
+        // 4. 包含匹配（较短方 ≥ 4 字符防误命中）：
+        //    方向 A 文件夹包含库名（文件夹带额外后缀/捆绑）→ 最长库名最具体；
+        //    方向 B 库名包含文件夹（文件夹是库名的一部分）→ 最短库名最接近。
+        var folderNorm = Normalize(folderName);
+        if (folderNorm.Length >= 4)
+        {
+            foreach (var (name, tid) in _byNameEntries)
+            {
+                if (name.Length < 4)
+                {
+                    continue;
+                }
+
+                if (folderNorm.Contains(name, StringComparison.Ordinal))
+                {
+                    return tid;
+                }
+            }
+
+            string? bestTid = null;
+            var bestLen = int.MaxValue;
+            foreach (var (name, tid) in _byNameEntries)
+            {
+                if (name.Length < 4 || name.Length >= bestLen)
+                {
+                    continue;
+                }
+
+                if (name.Contains(folderNorm, StringComparison.Ordinal))
+                {
+                    bestTid = tid;
+                    bestLen = name.Length;
+                }
+            }
+
+            if (bestTid != null)
+            {
+                return bestTid;
+            }
+        }
+
+        return null;
+    }
+
+    private IEnumerable<string> NormalizeCandidates(string name)
+    {
+        yield return Normalize(name);
+
+        var simplified = Normalize(ToSimplified(name));
+        if (simplified.Length > 0)
+        {
+            yield return simplified;
+        }
+
+        var aliased = Normalize(ApplyAliases(ToSimplified(name)));
+        if (aliased.Length > 0)
+        {
+            yield return aliased;
+        }
+    }
+
+    private static string StripTrailingParenthetical(string name)
+    {
+        var trimmed = name.Trim();
+        var pairs = new[] { ('（', '）'), ('(', ')'), ('[', ']') };
+        foreach (var (open, close) in pairs)
+        {
+            var closeIndex = trimmed.LastIndexOf(close);
+            if (closeIndex == trimmed.Length - 1)
+            {
+                var openIndex = trimmed.LastIndexOf(open);
+                if (openIndex >= 0)
+                {
+                    return trimmed[..openIndex].Trim();
+                }
+            }
+        }
+
+        return trimmed;
+    }
 
     /// <summary>TitleId → 封面候选图直链（按 图标→横幅→盒装 顺序），无则空数组。</summary>
     public IReadOnlyList<string> GetCoverUrls(string titleId)
@@ -227,8 +391,8 @@ public sealed class TitleDbService : ITitleDb
     private static string? GetString(JsonElement obj, string key)
         => obj.TryGetProperty(key, out var prop) ? prop.GetString() : null;
 
-    private sealed record TitleNames(string? Zh, string? ZhHant, string? En)
+    private sealed record TitleNames(string? Zh, string? ZhHant, string? En, string? Ja)
     {
-        public string? Best => Zh ?? ZhHant ?? En;
+        public string? Best => Zh ?? ZhHant ?? En ?? Ja;
     }
 }

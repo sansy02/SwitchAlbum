@@ -9,23 +9,18 @@ namespace SwitchAlbum.Services;
 /// 游戏封面服务，候选链（每个源失败自动试下一个，单个源内部重试 1 次）：
 /// 内置离线封面包（covers.zip，约 3000 款热门游戏，相册出现该游戏才解压）→
 /// 任天堂官方直链（图标/横幅/盒装，来自 titles.json）→ tinfoil.media（按 titleId）→
-/// SteamGridDB（按名称，需用户密钥）→ 失败返回 null（UI 显示占位）。
-/// 成功结果按 key（titleId 或名称哈希）缓存到本地。
+/// 失败返回 null（UI 显示占位）。成功结果按 key（titleId 或名称哈希）缓存到本地。
 /// </summary>
 public sealed class CoverService
 {
     private const string TinfoilBase = "https://tinfoil.media/ti/{0}/512/512";
-    private const string SteamGridSearch = "https://www.steamgriddb.com/api/v2/search/autocomplete/{0}";
-    private const string SteamGridGrids = "https://www.steamgriddb.com/api/v2/grids/game/{0}?dimensions=600x900";
 
     private readonly string _cacheDir;
-    private readonly SettingsService _settings;
     private readonly HttpClient _http;
     private readonly SemaphoreSlim _semaphore = new(4);
 
-    public CoverService(SettingsService settings, string? cacheDir = null)
+    public CoverService(string? cacheDir = null)
     {
-        _settings = settings;
         _cacheDir = cacheDir ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "SwitchAlbum", "covers");
@@ -76,12 +71,6 @@ public sealed class CoverService
 
             if (!string.IsNullOrEmpty(titleId)
                 && await TryDownloadAsync(string.Format(TinfoilBase, titleId), path, ct).ConfigureAwait(false))
-            {
-                return path;
-            }
-
-            if (!string.IsNullOrWhiteSpace(_settings.Current.SteamGridDbApiKey)
-                && await TrySteamGridAsync(title, path, ct).ConfigureAwait(false))
             {
                 return path;
             }
@@ -181,61 +170,6 @@ public sealed class CoverService
         }
 
         return false;
-    }
-
-    private async Task<bool> TrySteamGridAsync(string title, string dest, CancellationToken ct)
-    {
-        try
-        {
-            var key = _settings.Current.SteamGridDbApiKey!;
-            var searchUrl = string.Format(SteamGridSearch, Uri.EscapeDataString(title));
-
-            using var searchRequest = new HttpRequestMessage(HttpMethod.Get, searchUrl);
-            searchRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
-            using var searchResponse = await _http.SendAsync(searchRequest, ct).ConfigureAwait(false);
-            if (!searchResponse.IsSuccessStatusCode)
-            {
-                return false;
-            }
-
-            var searchJson = await searchResponse.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            using var searchDoc = JsonDocument.Parse(searchJson);
-            var data = searchDoc.RootElement.GetProperty("data");
-            if (data.GetArrayLength() == 0)
-            {
-                return false;
-            }
-
-            var gameId = data[0].GetProperty("id").GetInt32();
-
-            using var gridsRequest = new HttpRequestMessage(HttpMethod.Get, string.Format(SteamGridGrids, gameId));
-            gridsRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
-            using var gridsResponse = await _http.SendAsync(gridsRequest, ct).ConfigureAwait(false);
-            if (!gridsResponse.IsSuccessStatusCode)
-            {
-                return false;
-            }
-
-            var gridsJson = await gridsResponse.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            using var gridsDoc = JsonDocument.Parse(gridsJson);
-            var grids = gridsDoc.RootElement.GetProperty("data");
-            if (grids.GetArrayLength() == 0)
-            {
-                return false;
-            }
-
-            var imageUrl = grids[0].GetProperty("url").GetString();
-            if (string.IsNullOrEmpty(imageUrl))
-            {
-                return false;
-            }
-
-            return await TryDownloadAsync(imageUrl, dest, ct).ConfigureAwait(false);
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     private static void TryDelete(string path)

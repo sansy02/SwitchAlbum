@@ -33,7 +33,15 @@ public sealed class MockMediaProvider : IMediaProvider
         return Task.FromResult<IReadOnlyList<MediaDeviceInfo>>(new[]
         {
             new MediaDeviceInfo(SwitchDeviceId, "Switch（模拟）", isSwitch: true),
-            new MediaDeviceInfo(PhoneDeviceId, "Android 手机（模拟）", isSwitch: false),
+            new MediaDeviceInfo(PhoneDeviceId, "Android 手机（模拟）", isSwitch: false, isPhoneCandidate: true),
+        });
+    }
+
+    public Task<IReadOnlyList<MediaDeviceInfo>> GetPhoneCandidateDevicesAsync(CancellationToken ct)
+    {
+        return Task.FromResult<IReadOnlyList<MediaDeviceInfo>>(new[]
+        {
+            new MediaDeviceInfo(PhoneDeviceId, "Android 手机（模拟）", isSwitch: false, isPhoneCandidate: true),
         });
     }
 

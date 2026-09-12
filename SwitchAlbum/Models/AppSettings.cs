@@ -16,9 +16,6 @@ public sealed class AppSettings
     /// <summary>System / Light / Dark。</summary>
     public string Theme { get; set; } = "System";
 
-    /// <summary>SteamGridDB API 密钥（可选）。</summary>
-    public string? SteamGridDbApiKey { get; set; }
-
     // 窗口状态
     public double WindowWidth { get; set; } = 1280;
     public double WindowHeight { get; set; } = 800;

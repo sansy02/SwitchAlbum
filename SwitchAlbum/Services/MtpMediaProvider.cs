@@ -35,6 +35,59 @@ public sealed class MtpMediaProvider : IMediaProvider, IDisposable
         }, ct);
     }
 
+    public Task<IReadOnlyList<MediaDeviceInfo>> GetPhoneCandidateDevicesAsync(CancellationToken ct)
+    {
+        EnsurePoller();
+        return Task.Run<IReadOnlyList<MediaDeviceInfo>>(() =>
+        {
+            var result = new List<MediaDeviceInfo>();
+            foreach (var device in EnumerateAllDevices())
+            {
+                ct.ThrowIfCancellationRequested();
+                var info = ToInfo(device);
+                if (info.IsSwitch)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    ConnectDevice(device);
+                    var protocol = device.Protocol;
+                    if (protocol != null && protocol.Contains("MTP", StringComparison.OrdinalIgnoreCase))
+                    {
+                        result.Add(new MediaDeviceInfo(device.DeviceId, info.FriendlyName, isSwitch: false, isPhoneCandidate: true));
+                        Log.Info($"手机候选设备: {info.FriendlyName} (协议 {protocol})");
+                    }
+                    else
+                    {
+                        Log.Info($"排除非手机设备: {info.FriendlyName} (协议 {protocol ?? "未知"})");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Info($"探测设备协议失败（忽略）: {info.FriendlyName} — {ex.Message}");
+                }
+                finally
+                {
+                    try
+                    {
+                        if (device.IsConnected)
+                        {
+                            device.Disconnect();
+                        }
+                    }
+                    catch
+                    {
+                        // 物理断开时忽略
+                    }
+                }
+            }
+
+            return result;
+        }, ct);
+    }
+
     public Task<IMediaDeviceSession> ConnectAsync(MediaDeviceInfo info, CancellationToken ct)
     {
         return Task.Run<IMediaDeviceSession>(() =>

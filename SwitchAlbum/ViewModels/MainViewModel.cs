@@ -23,7 +23,9 @@ public partial class MainViewModel : ObservableObject
 
     private IMediaProvider _provider;
     private IMediaDeviceSession? _session;
+    private LocalFolderSession? _localSession;
     private ScanResult? _scan;
+    private ScanResult? _localScan;
     private CancellationTokenSource? _scanCts;
     private CancellationTokenSource? _transferCts;
     private Window? _owner;
@@ -61,12 +63,30 @@ public partial class MainViewModel : ObservableObject
     // ---------- 状态 ----------
     public AppSettings Settings => _settings.Current;
 
-    /// <summary>内容区当前视图（卡片墙或照片网格），视图切换触发过渡动画。</summary>
-    public object? CurrentContent => ShowWall ? Wall : Grid;
+    /// <summary>内容区当前视图（Switch 墙/网格 或 本地相册墙/网格），视图切换触发过渡动画。</summary>
+    public object? CurrentContent => IsLocalMode
+        ? (ShowLocalWall ? LocalWall : LocalGrid)
+        : (ShowWall ? Wall : Grid);
 
+    partial void OnIsLocalModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CurrentContent));
+        OnPropertyChanged(nameof(HintText));
+        OnPropertyChanged(nameof(HintVisible));
+    }
+
+    partial void OnShowLocalWallChanged(bool value) => OnPropertyChanged(nameof(CurrentContent));
     partial void OnShowWallChanged(bool value) => OnPropertyChanged(nameof(CurrentContent));
     partial void OnWallChanged(GameWallViewModel? value) => OnPropertyChanged(nameof(CurrentContent));
     partial void OnGridChanged(GameGridViewModel? value) => OnPropertyChanged(nameof(CurrentContent));
+    partial void OnLocalWallChanged(GameWallViewModel? value) => OnPropertyChanged(nameof(CurrentContent));
+    partial void OnLocalGridChanged(GameGridViewModel? value) => OnPropertyChanged(nameof(CurrentContent));
+
+    private ScanResult? ActiveScan => IsLocalMode ? _localScan : _scan;
+    private IMediaDeviceSession? ActiveSession => IsLocalMode ? _localSession : _session;
+    private string? ActiveDeviceKey => IsLocalMode ? "local" : _deviceKey;
+    private GameGridViewModel? ActiveGrid => IsLocalMode ? LocalGrid : Grid;
+    private GameWallViewModel? ActiveWall => IsLocalMode ? LocalWall : Wall;
 
     [ObservableProperty] private string _deviceStatusText = Strings.Status_NotConnected;
     [ObservableProperty] private bool _isDeviceConnected;
@@ -78,6 +98,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _showWall = true;
     [ObservableProperty] private GameWallViewModel? _wall;
     [ObservableProperty] private GameGridViewModel? _grid;
+    [ObservableProperty] private bool _isLocalMode;
+    [ObservableProperty] private bool _showLocalWall = true;
+    [ObservableProperty] private GameWallViewModel? _localWall;
+    [ObservableProperty] private GameGridViewModel? _localGrid;
     [ObservableProperty] private LightboxViewModel? _lightbox;
     [ObservableProperty] private string _hintText = "";
     [ObservableProperty] private bool _hintVisible;
@@ -104,6 +128,7 @@ public partial class MainViewModel : ObservableObject
     {
         _tracker.Flush();
         await DisposeSessionAsync();
+        await DisposeLocalSessionAsync();
     }
 
     // ---------- 设备 ----------
@@ -122,6 +147,15 @@ public partial class MainViewModel : ObservableObject
             {
                 // 设备已物理断开时 Dispose 可能失败
             }
+        }
+    }
+
+    private async Task DisposeLocalSessionAsync()
+    {
+        var session = Interlocked.Exchange(ref _localSession, null);
+        if (session != null)
+        {
+            await session.DisposeAsync();
         }
     }
 
@@ -161,8 +195,13 @@ public partial class MainViewModel : ObservableObject
         Grid = null;
         CloseLightbox();
         ShowWall = true;
-        HintText = Strings.Hint_ConnectSwitch;
-        HintVisible = true;
+
+        // 本地相册页浏览中不受 Switch 断开影响
+        if (!IsLocalMode)
+        {
+            HintText = Strings.Hint_ConnectSwitch;
+            HintVisible = true;
+        }
     }
 
     // ---------- 扫描 ----------
@@ -280,7 +319,8 @@ public partial class MainViewModel : ObservableObject
     // ---------- 视图切换 ----------
     public void OpenGame(GameCardViewModel card)
     {
-        if (_scan == null)
+        var scan = ActiveScan;
+        if (scan == null)
         {
             return;
         }
@@ -288,25 +328,41 @@ public partial class MainViewModel : ObservableObject
         IReadOnlyList<AlbumItem> items;
         if (card.IsAllCard || card.DevicePath == null)
         {
-            items = _scan.AllItems;
+            items = scan.AllItems;
         }
         else
         {
-            items = _scan.ItemsByGame.TryGetValue(card.DevicePath, out var list)
+            items = scan.ItemsByGame.TryGetValue(card.DevicePath, out var list)
                 ? list
                 : Array.Empty<AlbumItem>();
         }
 
-        Grid = new GameGridViewModel(card.Title, items, this);
-        ShowWall = false;
+        if (IsLocalMode)
+        {
+            LocalGrid = new LocalGameGridViewModel(card.Title, items, this);
+            ShowLocalWall = false;
+        }
+        else
+        {
+            Grid = new GameGridViewModel(card.Title, items, this);
+            ShowWall = false;
+        }
     }
 
     [RelayCommand]
     private void BackToWall()
     {
-        Grid = null;
         CloseLightbox();
-        ShowWall = true;
+        if (IsLocalMode)
+        {
+            LocalGrid = null;
+            ShowLocalWall = true;
+        }
+        else
+        {
+            Grid = null;
+            ShowWall = true;
+        }
     }
 
     public void OpenLightbox(IReadOnlyList<PhotoItemViewModel> items, PhotoItemViewModel current)
@@ -325,31 +381,35 @@ public partial class MainViewModel : ObservableObject
     // ---------- 图片 / 视频 ----------
     public Task<string?> LoadThumbnailAsync(PhotoItemViewModel item)
     {
-        if (_session == null || _deviceKey == null)
+        var session = ActiveSession;
+        var deviceKey = ActiveDeviceKey;
+        if (session == null || deviceKey == null)
         {
             return Task.FromResult<string?>(null);
         }
 
         return _thumbnailService.GetThumbnailAsync(
-            _deviceKey, _session, item.Item.DevicePath, item.Item.FileName,
+            deviceKey, session, item.Item.DevicePath, item.Item.FileName,
             item.Item.LastModified, item.Item.Size, CancellationToken.None);
     }
 
     private Task<string?> LoadFullImageAsync(PhotoItemViewModel item)
     {
-        if (_session == null || _deviceKey == null)
+        var session = ActiveSession;
+        var deviceKey = ActiveDeviceKey;
+        if (session == null || deviceKey == null)
         {
             return Task.FromResult<string?>(null);
         }
 
         return _thumbnailService.GetFullImageAsync(
-            _deviceKey, _session, item.Item.DevicePath, item.Item.FileName,
+            deviceKey, session, item.Item.DevicePath, item.Item.FileName,
             item.Item.LastModified, item.Item.Size, CancellationToken.None);
     }
 
     public async Task OpenVideoAsync(PhotoItemViewModel item)
     {
-        if (_session == null)
+        if (ActiveSession == null)
         {
             return;
         }
@@ -381,18 +441,6 @@ public partial class MainViewModel : ObservableObject
     }
 
     // ---------- 保存到电脑 ----------
-    [RelayCommand]
-    private async Task SaveAllAsync()
-    {
-        if (_session == null || _scan == null || _scan.AllItems.Count == 0)
-        {
-            ShowToast(Strings.Hint_EmptyAlbum);
-            return;
-        }
-
-        await SaveToPcCoreAsync(_scan.AllItems);
-    }
-
     [RelayCommand]
     private async Task SaveSelectedAsync()
     {
@@ -454,36 +502,126 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    // ---------- 保存到手机 ----------
+    // ---------- 顶栏页面切换标签 ----------
+    /// <summary>
+    /// 「保存到此电脑」标签：切回 Switch 相册页。与「从电脑保存到手机」标签逻辑对称——
+    /// 点击非当前页标签即切换页面，当前页标签保持激活态（紫底白字）。
+    /// </summary>
     [RelayCommand]
-    private async Task SaveAllToPhoneAsync()
+    private void SaveToPc()
     {
-        if (_session == null || _scan == null || _scan.AllItems.Count == 0)
+        if (IsLocalMode)
         {
-            ShowToast(Strings.Hint_EmptyAlbum);
+            BackToSwitch();
+        }
+    }
+
+    // ---------- 本地相册页（从电脑保存到手机） ----------
+    [RelayCommand]
+    private async Task OpenLocalAlbumAsync()
+    {
+        var savePath = _settings.Current.SavePath;
+        if (string.IsNullOrWhiteSpace(savePath) || !Directory.Exists(savePath))
+        {
+            ShowToast(Strings.Msg_PathInvalid);
             return;
         }
 
-        await SaveToPhoneCoreAsync(_scan.AllItems);
+        await DisposeLocalSessionAsync();
+        _localSession = new LocalFolderSession(savePath);
+
+        IsScanning = true;
+        ProgressIndeterminate = true;
+        ProgressText = "";
+        try
+        {
+            _localScan = await AlbumScanner.ScanAsync(_localSession, _titleDb, CancellationToken.None);
+        }
+        finally
+        {
+            IsScanning = false;
+            ProgressIndeterminate = false;
+        }
+
+        if (_localScan == null || _localScan.AllItems.Count == 0)
+        {
+            LocalWall = null;
+            LocalGrid = null;
+            CloseLightbox();
+            ShowLocalWall = true;
+            HintText = Strings.Local_EmptyHint;
+            HintVisible = true;
+            IsLocalMode = true;
+            return;
+        }
+
+        foreach (var item in _localScan.AllItems)
+        {
+            item.Saved = _tracker.GetState(item.GameTitle, item.FileName);
+        }
+
+        LocalWall = new GameWallViewModel(_localScan, this);
+        LocalGrid = null;
+        CloseLightbox();
+        ShowLocalWall = true;
+        HintVisible = false;
+        IsLocalMode = true;
+    }
+
+    /// <summary>返回 Switch 相册页（顶栏「保存到此电脑」在本地模式下触发）。</summary>
+    private void BackToSwitch()
+    {
+        IsLocalMode = false;
+        CloseLightbox();
+        ShowWall = Wall != null;
+        if (Wall == null)
+        {
+            HintText = Strings.Hint_ConnectSwitch;
+            HintVisible = true;
+        }
+        else
+        {
+            HintVisible = false;
+        }
     }
 
     [RelayCommand]
-    private async Task SaveSelectedToPhoneAsync()
+    private async Task LocalSaveAllToPhoneAsync()
     {
-        var selected = Grid?.SelectedItems();
+        if (_localSession == null || _localScan == null || _localScan.AllItems.Count == 0)
+        {
+            ShowToast(Strings.Local_EmptyHint);
+            return;
+        }
+
+        await SaveLocalToPhoneCoreAsync(_localScan.AllItems);
+    }
+
+    [RelayCommand]
+    private async Task LocalSaveSelectedToPhoneAsync()
+    {
+        var selected = LocalGrid?.SelectedItems();
         if (selected == null || selected.Count == 0)
         {
             ShowToast(Strings.Status_NoSelection);
             return;
         }
 
-        await SaveToPhoneCoreAsync(selected);
+        await SaveLocalToPhoneCoreAsync(selected);
     }
 
-    private async Task SaveToPhoneCoreAsync(IReadOnlyList<AlbumItem> items)
+    private async Task SaveLocalToPhoneCoreAsync(IReadOnlyList<AlbumItem> items)
     {
-        if (_session == null)
+        if (_localSession == null)
         {
+            return;
+        }
+
+        // 先解析手机设备再进入传输状态：未连手机时只有提示，不闪进度条
+        var phone = await ResolvePhoneSessionAsync(CancellationToken.None);
+        if (phone == null)
+        {
+            ProgressText = Strings.Status_NoPhone;
             return;
         }
 
@@ -494,18 +632,10 @@ public partial class MainViewModel : ObservableObject
         ProgressValue = 0;
         ProgressIndeterminate = false;
 
-        var phone = await ResolvePhoneSessionAsync(ct);
-        if (phone == null)
-        {
-            IsTransferring = false;
-            _transferCts = null;
-            return;
-        }
-
         await using (phone)
         {
             var result = await _phoneSaveService.SaveToPhoneAsync(
-                items, _session, phone, _settings.Current.AutoRename,
+                items, _localSession, phone, _settings.Current.AutoRename,
                 new Progress<SaveProgress>(p => ReportSaveProgress(p, toPhone: true, generation)), ct);
 
             RefreshSavedStates();
@@ -528,10 +658,23 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    private static bool IsAppleDeviceName(string name)
+        => name.Contains("iphone", StringComparison.OrdinalIgnoreCase)
+           || name.Contains("ipad", StringComparison.OrdinalIgnoreCase)
+           || name.Contains("apple", StringComparison.OrdinalIgnoreCase);
+
     private async Task<IMediaDeviceSession?> ResolvePhoneSessionAsync(CancellationToken ct)
     {
-        var devices = await _provider.GetDevicesAsync(ct);
-        var phones = devices.Where(d => !d.IsSwitch).ToList();
+        // iPhone 走 PTP 协议、不会出现在 MTP 候选列表里，这里单独提示苹果平台限制
+        var allDevices = await _provider.GetDevicesAsync(ct);
+        if (allDevices.Any(d => !d.IsSwitch && IsAppleDeviceName(d.FriendlyName)))
+        {
+            ShowToast(Strings.Phone_AppleUnsupported);
+            return null;
+        }
+
+        // 仅 MTP 协议设备（安卓手机）为候选；MSC 硬盘/U 盘被过滤
+        var phones = (await _provider.GetPhoneCandidateDevicesAsync(ct)).ToList();
         if (phones.Count == 0)
         {
             ShowToast(Strings.Status_NoPhone);
@@ -555,6 +698,7 @@ public partial class MainViewModel : ObservableObject
             var dialog = new Views.DevicePickerDialog(phones) { Owner = _owner };
             if (dialog.ShowDialog() != true)
             {
+                ShowToast(Strings.Status_NoPhone);
                 return null;
             }
 
@@ -585,10 +729,10 @@ public partial class MainViewModel : ObservableObject
 
     // ---------- 选择 ----------
     [RelayCommand]
-    private void SelectAll() => Grid?.SetAllSelected(true);
+    private void SelectAll() => ActiveGrid?.SetAllSelected(true);
 
     [RelayCommand]
-    private void DeselectAll() => Grid?.SetAllSelected(false);
+    private void DeselectAll() => ActiveGrid?.SetAllSelected(false);
 
     // ---------- 设置 / 其他 ----------
     [RelayCommand]
@@ -667,15 +811,15 @@ public partial class MainViewModel : ObservableObject
 
     private void RefreshSavedStates()
     {
-        if (Wall != null)
+        if (ActiveWall != null)
         {
-            foreach (var card in Wall.Cards)
+            foreach (var card in ActiveWall.Cards)
             {
                 card.RefreshSaved();
             }
         }
 
-        Grid?.RefreshSaved();
+        ActiveGrid?.RefreshSaved();
     }
 
     public void ShowToast(string text)

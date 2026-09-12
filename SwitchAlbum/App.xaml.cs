@@ -35,7 +35,7 @@ public partial class App : Application
         var saveService = new SaveService(tracker);
         var phoneSaveService = new PhoneSaveService(tracker, _settings);
         var thumbnailService = new ThumbnailService();
-        var coverService = new CoverService(_settings);
+        var coverService = new CoverService();
 
         var mainViewModel = new MainViewModel(
             _settings, _theme, tracker, saveService, phoneSaveService,

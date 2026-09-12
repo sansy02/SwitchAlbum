@@ -70,7 +70,7 @@ public static class AlbumScanner
             if (parsed.Title != null)
             {
                 title = parsed.Title;
-                titleId = parsed.TitleId ?? titleDb?.GetTitleIdByName(parsed.Title);
+                titleId = parsed.TitleId ?? titleDb?.GetTitleIdByFolderName(parsed.Title);
             }
             else if (parsed.TitleId != null)
             {

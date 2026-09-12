@@ -26,6 +26,12 @@ public interface IMediaProvider
 {
     Task<IReadOnlyList<MediaDeviceInfo>> GetDevicesAsync(CancellationToken ct);
 
+    /// <summary>
+    /// 枚举可作为「保存到手机」目标的设备：连接后按协议过滤（MTP = 安卓手机；
+    /// MSC = 硬盘/U 盘，PTP = 相机/iPhone/Switch，均排除）。按需调用（不做轮询）。
+    /// </summary>
+    Task<IReadOnlyList<MediaDeviceInfo>> GetPhoneCandidateDevicesAsync(CancellationToken ct);
+
     Task<IMediaDeviceSession> ConnectAsync(MediaDeviceInfo device, CancellationToken ct);
 
     /// <summary>设备插拔通知（可能来自任意线程）。</summary>

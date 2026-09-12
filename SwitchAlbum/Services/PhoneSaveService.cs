@@ -1,10 +1,11 @@
 using SwitchAlbum.Models;
+using SwitchAlbum.Services.Parsing;
 
 namespace SwitchAlbum.Services;
 
 /// <summary>
-/// 保存到安卓手机：定位存储根 → 按拍摄日期建 DCIM\SwitchAlbum\YYYY-MM-DD →
-/// 从 Switch 下载到本地临时文件 → 上传手机 → 校验 → 标记已保存。
+/// 保存到安卓手机：定位存储根 → 按游戏建 DCIM\SwitchAlbum\游戏名 →
+/// 从源会话下载到本地临时文件 → 上传手机 → 校验 → 标记已保存。
 /// </summary>
 public sealed class PhoneSaveService
 {
@@ -48,7 +49,7 @@ public sealed class PhoneSaveService
 
         progress?.Report(new SaveProgress(items.Count, done, skipped, null));
 
-        foreach (var group in pending.GroupBy(DateKeyOf).OrderBy(g => g.Key, StringComparer.Ordinal))
+        foreach (var group in pending.GroupBy(GameFolderOf).OrderBy(g => g.Key, StringComparer.Ordinal))
         {
             ct.ThrowIfCancellationRequested();
 
@@ -200,8 +201,8 @@ public sealed class PhoneSaveService
         return state is SavedState.SavedToPhone or SavedState.SavedBoth;
     }
 
-    private static string DateKeyOf(AlbumItem item)
-        => item.Timestamp == DateTime.MinValue ? "未知日期" : item.Timestamp.ToString("yyyy-MM-dd");
+    private static string GameFolderOf(AlbumItem item)
+        => FileNameSanitizer.Sanitize(item.GameTitle);
 
     private static void TryDelete(string path)
     {

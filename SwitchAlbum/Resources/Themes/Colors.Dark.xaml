@@ -11,6 +11,9 @@
     <SolidColorBrush x:Key="AccentBrush" Color="#E60012"/>
     <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF1E2E"/>
     <SolidColorBrush x:Key="AccentSoftBrush" Color="#33E60012"/>
+    <SolidColorBrush x:Key="PurpleBrush" Color="#8B6BFF"/>
+    <SolidColorBrush x:Key="PurpleHoverBrush" Color="#7A57F0"/>
+    <SolidColorBrush x:Key="PurpleSoftBrush" Color="#322A56"/>
     <SolidColorBrush x:Key="DeviceDotBrush" Color="#2FBF71"/>
     <SolidColorBrush x:Key="DeviceDotOffBrush" Color="#F25555"/>
     <SolidColorBrush x:Key="SuccessBrush" Color="#6CCB5F"/>

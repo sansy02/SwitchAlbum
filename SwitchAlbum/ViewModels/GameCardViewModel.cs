@@ -45,7 +45,8 @@ public sealed partial class GameCardViewModel : ObservableObject
 
     public async Task EnsureCoverAsync()
     {
-        if (Interlocked.Increment(ref _coverLoadStarted) != 1 || TitleId == null)
+        // TitleId 为 null 也尝试：至少留下失败日志，便于排查名称反查缺口
+        if (Interlocked.Increment(ref _coverLoadStarted) != 1)
         {
             return;
         }

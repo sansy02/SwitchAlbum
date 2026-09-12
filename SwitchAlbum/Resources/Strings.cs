@@ -16,10 +16,11 @@ public static class Strings
 
     // 按钮
     public const string Btn_Rescan = "重新扫描";
-    public const string Btn_SaveAll = "一键保存全部";
     public const string Btn_SaveSelected = "保存所选";
-    public const string Btn_SaveToPhone = "保存到手机";
     public const string Btn_SaveSelectedToPhone = "保存所选到手机";
+    public const string Btn_SaveAllToPhone = "保存全部到手机";
+    public const string Btn_SaveToPc = "保存到此电脑";
+    public const string Btn_PcToPhone = "从电脑保存到手机";
     public const string Btn_Settings = "设置";
     public const string Btn_ChangePath = "更改";
     public const string Btn_Cancel = "取消";
@@ -69,9 +70,9 @@ public static class Strings
     public const string Settings_Theme_Light = "浅色";
     public const string Settings_Theme_Dark = "深色";
     public const string Settings_AutoRename = "保存时自动重命名（日期_游戏名_序号）";
+    public const string Settings_AutoRenameExample = "示例：20250912_塞尔达传说 王国之泪_001.jpg";
     public const string Settings_PhoneDevice = "保存到手机的目标设备";
     public const string Settings_PhoneDevice_Auto = "自动检测";
-    public const string Settings_ApiKey = "SteamGridDB API 密钥（可选，封面备选图源）";
     public const string Settings_PickFolder = "选择保存文件夹";
     public const string Settings_Close = "关闭";
 
@@ -79,6 +80,17 @@ public static class Strings
     public const string Phone_Picker_Title = "选择手机设备";
     public const string Phone_Refresh = "刷新设备列表";
     public const string Phone_None = "未检测到手机设备";
+    public const string Phone_AppleUnsupported = "检测到苹果设备：iOS 不允许电脑通过 USB 写入相册，暂不支持保存到 iPhone";
+
+    // 本地相册页（从电脑保存到手机）
+    public const string Local_EmptyHint = "电脑上还没有保存过照片。请先连接 Switch，把照片「保存到此电脑」，再来这里传到手机。";
+    public const string Btn_OpenSaveFolder = "打开保存文件夹";
+    public const string Btn_ClearCache = "清除封面与缩略图缓存";
+    public const string Status_CacheCleared = "缓存已清除";
+    public const string Status_CacheClearedWithSize = "缓存已清除（释放 {0}）";
+    public const string Settings_CacheSize = "当前缓存占用 {0}";
+    public const string Settings_CacheSizeNone = "当前无缓存";
+    public const string Status_LocalAlbumTitle = "本机相册";
 
     // 通用
     public const string Common_Ok = "确定";

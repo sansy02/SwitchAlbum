@@ -21,6 +21,9 @@
         <DataTemplate DataType="{x:Type vm:GameGridViewModel}">
             <views:GameGridView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:LocalGameGridViewModel}">
+            <views:LocalGameGridView/>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
@@ -66,21 +69,85 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="{x:Static res:Strings.Lbl_SavePath}" VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0"/>
-                    <TextBlock Text="{Binding SavePathText}" VerticalAlignment="Center" MaxWidth="230"
-                               TextTrimming="CharacterEllipsis" ToolTip="{Binding SavePathText}"/>
-                    <Button Content="{x:Static res:Strings.Btn_ChangePath}" Command="{Binding ChangeSavePathCommand}"
-                            Style="{StaticResource SubtleButtonStyle}" Margin="8,0,0,0" Padding="10,5" FontSize="12"/>
+                    <!-- Switch 模式按钮组 -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                Visibility="{Binding IsLocalMode, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
+                        <TextBlock Text="{x:Static res:Strings.Lbl_SavePath}" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding SavePathText}" VerticalAlignment="Center" MaxWidth="130"
+                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding SavePathText}"/>
+                        <Button Content="{x:Static res:Strings.Btn_ChangePath}" Command="{Binding ChangeSavePathCommand}"
+                                Style="{StaticResource SubtleButtonStyle}" Margin="8,0,0,0" Padding="10,5" FontSize="12"/>
 
-                    <Rectangle Width="1" Height="22" Fill="{DynamicResource BorderBrush}" Margin="16,0"/>
+                        <Rectangle Width="1" Height="22" Fill="{DynamicResource BorderBrush}" Margin="16,0"/>
 
-                    <Button Content="{x:Static res:Strings.Btn_Rescan}" Command="{Binding RescanCommand}"
-                            Style="{StaticResource SubtleButtonStyle}"/>
-                    <Button Content="{x:Static res:Strings.Btn_SaveAll}" Command="{Binding SaveAllCommand}"
-                            Style="{StaticResource PrimaryButtonStyle}" Margin="10,0,0,0"/>
-                    <Button Content="{x:Static res:Strings.Btn_SaveToPhone}" Command="{Binding SaveAllToPhoneCommand}"
-                            Style="{StaticResource AccentOutlineButtonStyle}" Margin="10,0,0,0"/>
+                        <Button Content="{x:Static res:Strings.Btn_Rescan}" Command="{Binding RescanCommand}"
+                                Style="{StaticResource SubtleButtonStyle}"/>
+                    </StackPanel>
+
+                    <!-- 本地相册模式按钮组 -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                Visibility="{Binding IsLocalMode, Converter={StaticResource BoolToVis}}">
+                        <Button Content="{x:Static res:Strings.Btn_SaveAllToPhone}" Command="{Binding LocalSaveAllToPhoneCommand}"
+                                Style="{StaticResource PrimaryButtonStyle}"/>
+                    </StackPanel>
+
+                    <!-- 页面切换标签：激活 = 紫底白字，非激活 = 白底紫字，两键逻辑一致 -->
+                    <Button Content="{x:Static res:Strings.Btn_SaveToPc}" Command="{Binding SaveToPcCommand}"
+                            Margin="10,0,0,0" Padding="18,7">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PageTabActiveButtonStyle}">
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsLocalMode}" Value="True"/>
+                                            <Condition Property="IsMouseOver" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource PurpleBrush}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource PurpleBrush}"/>
+                                    </MultiDataTrigger>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsLocalMode}" Value="True"/>
+                                            <Condition Property="IsMouseOver" Value="True"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Background" Value="{DynamicResource PurpleSoftBrush}"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource PurpleBrush}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource PurpleBrush}"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Content="{x:Static res:Strings.Btn_PcToPhone}" Command="{Binding OpenLocalAlbumCommand}"
+                            Margin="10,0,0,0" Padding="18,7">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PageTabInactiveButtonStyle}">
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsLocalMode}" Value="True"/>
+                                            <Condition Property="IsMouseOver" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Background" Value="{DynamicResource PurpleBrush}"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource PurpleBrush}"/>
+                                    </MultiDataTrigger>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsLocalMode}" Value="True"/>
+                                            <Condition Property="IsMouseOver" Value="True"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Background" Value="{DynamicResource PurpleHoverBrush}"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource PurpleBrush}"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
                     <Button Content="{x:Static res:Strings.Btn_Settings}" Command="{Binding OpenSettingsCommand}"
                             Style="{StaticResource SubtleButtonStyle}" Margin="10,0,0,0"/>
                 </StackPanel>

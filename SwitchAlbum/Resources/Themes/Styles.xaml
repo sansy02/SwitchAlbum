@@ -77,6 +77,33 @@
         </Style.Triggers>
     </Style>
 
+    <!-- 页面切换标签：激活 = 紫底白字，非激活 = 白底紫字（两个主按钮共用同一套切换逻辑） -->
+    <Style x:Key="PageTabActiveButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
+        <Setter Property="Background" Value="{DynamicResource PurpleBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PurpleBrush}"/>
+        <Setter Property="BorderThickness" Value="1.2"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PurpleHoverBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="PageTabInactiveButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource PurpleBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PurpleBrush}"/>
+        <Setter Property="BorderThickness" Value="1.2"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PurpleSoftBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- 灯箱翻页/关闭按钮 -->
     <Style x:Key="LightboxButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
         <Setter Property="Background" Value="Transparent"/>
