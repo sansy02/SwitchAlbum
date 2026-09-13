@@ -1,4 +1,4 @@
-# SwitchPoter — Switch 相册管家
+# SwitchPorter — Switch 相册管家
 
 通过 USB 连接 Nintendo Switch，把截图与视频方便地保存到电脑或安卓手机。
 
