@@ -9,6 +9,7 @@ public sealed class MockMediaProvider : IMediaProvider
 {
     public const string SwitchDeviceId = "mock-switch";
     public const string PhoneDeviceId = "mock-phone";
+    public const string DriveDeviceId = "mock-drive";
 
     private readonly string _albumPath;
     private readonly string _phonePath;
@@ -34,6 +35,7 @@ public sealed class MockMediaProvider : IMediaProvider
         {
             new MediaDeviceInfo(SwitchDeviceId, "Switch（模拟）", isSwitch: true),
             new MediaDeviceInfo(PhoneDeviceId, "Android 手机（模拟）", isSwitch: false, isPhoneCandidate: true),
+            new MediaDeviceInfo(DriveDeviceId, "移动硬盘（模拟 MSC）", isSwitch: false),
         });
     }
 

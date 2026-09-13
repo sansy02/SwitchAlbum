@@ -8,6 +8,19 @@ using SwitchAlbum.Services;
 
 namespace SwitchAlbum.ViewModels;
 
+/// <summary>顶栏三个紫色标签对应的页面。</summary>
+public enum PageMode
+{
+    /// <summary>Switch 相册页（保存到此电脑）。</summary>
+    Switch,
+
+    /// <summary>本机相册页，保存到安卓手机（MTP）。</summary>
+    LocalAndroid,
+
+    /// <summary>本机相册页，iPhone 网页方案（扫码/局域网）。</summary>
+    LocalIphone,
+}
+
 public partial class MainViewModel : ObservableObject
 {
     private readonly SettingsService _settings;
@@ -64,15 +77,26 @@ public partial class MainViewModel : ObservableObject
     public AppSettings Settings => _settings.Current;
 
     /// <summary>内容区当前视图（Switch 墙/网格 或 本地相册墙/网格），视图切换触发过渡动画。</summary>
-    public object? CurrentContent => IsLocalMode
-        ? (ShowLocalWall ? LocalWall : LocalGrid)
-        : (ShowWall ? Wall : Grid);
+    public object? CurrentContent => PageMode == PageMode.Switch
+        ? (ShowWall ? Wall : Grid)
+        : (ShowLocalWall ? LocalWall : LocalGrid);
 
-    partial void OnIsLocalModeChanged(bool value)
+    /// <summary>本地相册页（安卓/苹果共用同一份本地扫描数据）。</summary>
+    private bool IsLocalPage => PageMode != PageMode.Switch;
+
+    /// <summary>供顶栏三标签的样式触发器使用。</summary>
+    public bool IsSwitchPage => PageMode == PageMode.Switch;
+    public bool IsAndroidPage => PageMode == PageMode.LocalAndroid;
+    public bool IsIphonePage => PageMode == PageMode.LocalIphone;
+
+    partial void OnPageModeChanged(PageMode value)
     {
         OnPropertyChanged(nameof(CurrentContent));
         OnPropertyChanged(nameof(HintText));
         OnPropertyChanged(nameof(HintVisible));
+        OnPropertyChanged(nameof(IsSwitchPage));
+        OnPropertyChanged(nameof(IsAndroidPage));
+        OnPropertyChanged(nameof(IsIphonePage));
     }
 
     partial void OnShowLocalWallChanged(bool value) => OnPropertyChanged(nameof(CurrentContent));
@@ -82,11 +106,11 @@ public partial class MainViewModel : ObservableObject
     partial void OnLocalWallChanged(GameWallViewModel? value) => OnPropertyChanged(nameof(CurrentContent));
     partial void OnLocalGridChanged(GameGridViewModel? value) => OnPropertyChanged(nameof(CurrentContent));
 
-    private ScanResult? ActiveScan => IsLocalMode ? _localScan : _scan;
-    private IMediaDeviceSession? ActiveSession => IsLocalMode ? _localSession : _session;
-    private string? ActiveDeviceKey => IsLocalMode ? "local" : _deviceKey;
-    private GameGridViewModel? ActiveGrid => IsLocalMode ? LocalGrid : Grid;
-    private GameWallViewModel? ActiveWall => IsLocalMode ? LocalWall : Wall;
+    private ScanResult? ActiveScan => IsLocalPage ? _localScan : _scan;
+    private IMediaDeviceSession? ActiveSession => IsLocalPage ? _localSession : _session;
+    private string? ActiveDeviceKey => IsLocalPage ? "local" : _deviceKey;
+    private GameGridViewModel? ActiveGrid => IsLocalPage ? LocalGrid : Grid;
+    private GameWallViewModel? ActiveWall => IsLocalPage ? LocalWall : Wall;
 
     [ObservableProperty] private string _deviceStatusText = Strings.Status_NotConnected;
     [ObservableProperty] private bool _isDeviceConnected;
@@ -98,10 +122,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _showWall = true;
     [ObservableProperty] private GameWallViewModel? _wall;
     [ObservableProperty] private GameGridViewModel? _grid;
-    [ObservableProperty] private bool _isLocalMode;
+    [ObservableProperty] private PageMode _pageMode = PageMode.Switch;
     [ObservableProperty] private bool _showLocalWall = true;
     [ObservableProperty] private GameWallViewModel? _localWall;
     [ObservableProperty] private GameGridViewModel? _localGrid;
+    [ObservableProperty] private string _iphoneUrl = "";
+    [ObservableProperty] private bool _isIphoneServerRunning;
     [ObservableProperty] private LightboxViewModel? _lightbox;
     [ObservableProperty] private string _hintText = "";
     [ObservableProperty] private bool _hintVisible;
@@ -129,6 +155,7 @@ public partial class MainViewModel : ObservableObject
         _tracker.Flush();
         await DisposeSessionAsync();
         await DisposeLocalSessionAsync();
+        _iphoneServer?.Dispose();
     }
 
     // ---------- 设备 ----------
@@ -197,7 +224,7 @@ public partial class MainViewModel : ObservableObject
         ShowWall = true;
 
         // 本地相册页浏览中不受 Switch 断开影响
-        if (!IsLocalMode)
+        if (!IsLocalPage)
         {
             HintText = Strings.Hint_ConnectSwitch;
             HintVisible = true;
@@ -337,7 +364,7 @@ public partial class MainViewModel : ObservableObject
                 : Array.Empty<AlbumItem>();
         }
 
-        if (IsLocalMode)
+        if (IsLocalPage)
         {
             LocalGrid = new LocalGameGridViewModel(card.Title, items, this);
             ShowLocalWall = false;
@@ -353,7 +380,7 @@ public partial class MainViewModel : ObservableObject
     private void BackToWall()
     {
         CloseLightbox();
-        if (IsLocalMode)
+        if (IsLocalPage)
         {
             LocalGrid = null;
             ShowLocalWall = true;
@@ -475,6 +502,7 @@ public partial class MainViewModel : ObservableObject
         _transferCts = new CancellationTokenSource();
         var ct = _transferCts.Token;
         var generation = ++_transferGeneration;
+        ResetSpeed();
         IsTransferring = true;
         ProgressValue = 0;
         ProgressIndeterminate = false;
@@ -504,21 +532,26 @@ public partial class MainViewModel : ObservableObject
 
     // ---------- 顶栏页面切换标签 ----------
     /// <summary>
-    /// 「保存到此电脑」标签：切回 Switch 相册页。与「从电脑保存到手机」标签逻辑对称——
+    /// 「保存到此电脑」标签：切回 Switch 相册页。三个标签逻辑一致——
     /// 点击非当前页标签即切换页面，当前页标签保持激活态（紫底白字）。
     /// </summary>
     [RelayCommand]
     private void SaveToPc()
     {
-        if (IsLocalMode)
+        if (IsLocalPage)
         {
             BackToSwitch();
         }
     }
 
-    // ---------- 本地相册页（从电脑保存到手机） ----------
+    // ---------- 本地相册页（保存到手机：安卓 / 苹果共用浏览数据） ----------
     [RelayCommand]
-    private async Task OpenLocalAlbumAsync()
+    private async Task OpenLocalAlbumAsync() => await OpenLocalPageAsync(PageMode.LocalAndroid);
+
+    [RelayCommand]
+    private async Task OpenIphonePageAsync() => await OpenLocalPageAsync(PageMode.LocalIphone);
+
+    private async Task OpenLocalPageAsync(PageMode target)
     {
         var savePath = _settings.Current.SavePath;
         if (string.IsNullOrWhiteSpace(savePath) || !Directory.Exists(savePath))
@@ -543,6 +576,11 @@ public partial class MainViewModel : ObservableObject
             ProgressIndeterminate = false;
         }
 
+        if (target == PageMode.LocalIphone)
+        {
+            EnsureIphoneServer();
+        }
+
         if (_localScan == null || _localScan.AllItems.Count == 0)
         {
             LocalWall = null;
@@ -551,7 +589,7 @@ public partial class MainViewModel : ObservableObject
             ShowLocalWall = true;
             HintText = Strings.Local_EmptyHint;
             HintVisible = true;
-            IsLocalMode = true;
+            PageMode = target;
             return;
         }
 
@@ -565,13 +603,13 @@ public partial class MainViewModel : ObservableObject
         CloseLightbox();
         ShowLocalWall = true;
         HintVisible = false;
-        IsLocalMode = true;
+        PageMode = target;
     }
 
-    /// <summary>返回 Switch 相册页（顶栏「保存到此电脑」在本地模式下触发）。</summary>
+    /// <summary>返回 Switch 相册页（顶栏「保存到此电脑」标签触发）。</summary>
     private void BackToSwitch()
     {
-        IsLocalMode = false;
+        PageMode = PageMode.Switch;
         CloseLightbox();
         ShowWall = Wall != null;
         if (Wall == null)
@@ -585,9 +623,59 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    // ---------- iPhone 网页方案（零安装：扫码 → 浏览器 → ZIP 批量） ----------
+    private IphoneWebServer? _iphoneServer;
+
+    private void EnsureIphoneServer()
+    {
+        if (_iphoneServer != null && _iphoneServer.IsRunning)
+        {
+            IphoneUrl = _iphoneServer.Url;
+            IsIphoneServerRunning = true;
+            return;
+        }
+
+        try
+        {
+            _iphoneServer?.Dispose();
+            _iphoneServer = new IphoneWebServer(_settings.Current.SavePath);
+            _iphoneServer.Start();
+            IphoneUrl = _iphoneServer.Url;
+            IsIphoneServerRunning = true;
+            Log.Info($"iPhone 网页服务已启动: {_iphoneServer.Url}");
+        }
+        catch (Exception ex)
+        {
+            Log.Error("iPhone 网页服务启动失败", ex);
+            IsIphoneServerRunning = false;
+            ShowToast(Strings.Iphone_ServerFailed);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenIphoneEntry()
+    {
+        if (_iphoneServer == null || !_iphoneServer.IsRunning)
+        {
+            EnsureIphoneServer();
+            if (_iphoneServer == null || !_iphoneServer.IsRunning)
+            {
+                return;
+            }
+        }
+
+        var dialog = new Views.IphoneDialog(_iphoneServer.Url) { Owner = _owner };
+        dialog.ShowDialog();
+    }
+
     [RelayCommand]
     private async Task LocalSaveAllToPhoneAsync()
     {
+        if (PageMode != PageMode.LocalAndroid)
+        {
+            return;
+        }
+
         if (_localSession == null || _localScan == null || _localScan.AllItems.Count == 0)
         {
             ShowToast(Strings.Local_EmptyHint);
@@ -600,6 +688,11 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task LocalSaveSelectedToPhoneAsync()
     {
+        if (PageMode != PageMode.LocalAndroid)
+        {
+            return;
+        }
+
         var selected = LocalGrid?.SelectedItems();
         if (selected == null || selected.Count == 0)
         {
@@ -628,6 +721,7 @@ public partial class MainViewModel : ObservableObject
         _transferCts = new CancellationTokenSource();
         var ct = _transferCts.Token;
         var generation = ++_transferGeneration;
+        ResetSpeed();
         IsTransferring = true;
         ProgressValue = 0;
         ProgressIndeterminate = false;
@@ -769,6 +863,17 @@ public partial class MainViewModel : ObservableObject
     private void CancelTransfer() => _transferCts?.Cancel();
 
     // ---------- 内部 ----------
+    private long _speedLastBytes;
+    private long _speedLastTicks;
+    private double _speedMbs;
+
+    private void ResetSpeed()
+    {
+        _speedLastBytes = 0;
+        _speedLastTicks = 0;
+        _speedMbs = 0;
+    }
+
     private void ReportSaveProgress(SaveProgress p, bool toPhone, int generation)
     {
         // 进度回调经 dispatcher 异步投递，可能在传输已结束后才到达；
@@ -778,9 +883,34 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        ProgressText = toPhone
+        var text = toPhone
             ? string.Format(Strings.Status_PhoneProgress, p.Done, p.Total, Path.GetFileName(p.CurrentFileName ?? ""))
             : string.Format(Strings.Status_Progress, p.Done, p.Total, Path.GetFileName(p.CurrentFileName ?? ""));
+
+        // 约 1 秒滑动窗口计算传输速度
+        var now = Stopwatch.GetTimestamp();
+        if (_speedLastTicks != 0)
+        {
+            var elapsed = (double)(now - _speedLastTicks) / Stopwatch.Frequency;
+            if (elapsed >= 1.0)
+            {
+                _speedMbs = (p.BytesDone - _speedLastBytes) / elapsed / (1024.0 * 1024.0);
+                _speedLastBytes = p.BytesDone;
+                _speedLastTicks = now;
+            }
+        }
+        else
+        {
+            _speedLastBytes = p.BytesDone;
+            _speedLastTicks = now;
+        }
+
+        if (_speedMbs > 0 && p.Done < p.Total)
+        {
+            text += string.Format(Strings.Status_SpeedSuffix, _speedMbs.ToString("F1"));
+        }
+
+        ProgressText = text;
         ProgressValue = p.Total == 0 ? 0 : p.Done * 100.0 / p.Total;
     }
 

@@ -46,8 +46,9 @@ public sealed class PhoneSaveService
         var failures = new List<(AlbumItem Item, string Error)>();
         var done = 0;
         var saved = 0;
+        long bytesDone = 0;
 
-        progress?.Report(new SaveProgress(items.Count, done, skipped, null));
+        progress?.Report(new SaveProgress(items.Count, done, skipped, null, 0));
 
         foreach (var group in pending.GroupBy(GameFolderOf).OrderBy(g => g.Key, StringComparer.Ordinal))
         {
@@ -92,15 +93,17 @@ public sealed class PhoneSaveService
                 {
                     await switchSession.DownloadFileAsync(item.DevicePath, tmp, ct).ConfigureAwait(false);
                     await phoneSession.UploadFileAsync(tmp, targetDir + "\\" + plan[item], ct).ConfigureAwait(false);
+                    var bytes = new FileInfo(tmp).Length;
                     _tracker.MarkSaved(item.GameTitle, item.FileName, plan[item], toPc: false, toPhone: true);
 
                     lock (_gate)
                     {
                         done++;
                         saved++;
+                        bytesDone += bytes;
                     }
 
-                    progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName));
+                    progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName, bytesDone));
                 }
                 catch (OperationCanceledException)
                 {
@@ -114,7 +117,7 @@ public sealed class PhoneSaveService
                         done++;
                     }
 
-                    progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName));
+                    progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName, bytesDone));
                 }
                 finally
                 {

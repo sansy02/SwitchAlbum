@@ -69,9 +69,18 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Switch 模式按钮组 -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
-                                Visibility="{Binding IsLocalMode, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
+                    <!-- Switch 页按钮组 -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PageMode}" Value="Switch">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
                         <TextBlock Text="{x:Static res:Strings.Lbl_SavePath}" VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0"/>
                         <TextBlock Text="{Binding SavePathText}" VerticalAlignment="Center" MaxWidth="130"
@@ -85,14 +94,41 @@
                                 Style="{StaticResource SubtleButtonStyle}"/>
                     </StackPanel>
 
-                    <!-- 本地相册模式按钮组 -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
-                                Visibility="{Binding IsLocalMode, Converter={StaticResource BoolToVis}}">
+                    <!-- 安卓页按钮组 -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PageMode}" Value="LocalAndroid">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
                         <Button Content="{x:Static res:Strings.Btn_SaveAllToPhone}" Command="{Binding LocalSaveAllToPhoneCommand}"
                                 Style="{StaticResource PrimaryButtonStyle}"/>
                     </StackPanel>
 
-                    <!-- 页面切换标签：激活 = 紫底白字，非激活 = 白底紫字，两键逻辑一致 -->
+                    <!-- 苹果页按钮组 -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PageMode}" Value="LocalIphone">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <Button Content="{x:Static res:Strings.Btn_IphoneEntry}" Command="{Binding OpenIphoneEntryCommand}"
+                                Style="{StaticResource PrimaryButtonStyle}"/>
+                        <TextBlock Text="{x:Static res:Strings.Iphone_ServerRunning}" VerticalAlignment="Center"
+                                   Margin="10,0,0,0" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
+
+                    <!-- 页面切换标签：激活 = 紫底白字，非激活 = 白底紫字，三键逻辑一致 -->
                     <Button Content="{x:Static res:Strings.Btn_SaveToPc}" Command="{Binding SaveToPcCommand}"
                             Margin="10,0,0,0" Padding="18,7">
                         <Button.Style>
@@ -100,8 +136,8 @@
                                 <Style.Triggers>
                                     <MultiDataTrigger>
                                         <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsLocalMode}" Value="True"/>
-                                            <Condition Property="IsMouseOver" Value="False"/>
+                                            <Condition Binding="{Binding IsSwitchPage}" Value="False"/>
+                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="False"/>
                                         </MultiDataTrigger.Conditions>
                                         <Setter Property="Background" Value="Transparent"/>
                                         <Setter Property="Foreground" Value="{DynamicResource PurpleBrush}"/>
@@ -109,8 +145,8 @@
                                     </MultiDataTrigger>
                                     <MultiDataTrigger>
                                         <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsLocalMode}" Value="True"/>
-                                            <Condition Property="IsMouseOver" Value="True"/>
+                                            <Condition Binding="{Binding IsSwitchPage}" Value="False"/>
+                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
                                         </MultiDataTrigger.Conditions>
                                         <Setter Property="Background" Value="{DynamicResource PurpleSoftBrush}"/>
                                         <Setter Property="Foreground" Value="{DynamicResource PurpleBrush}"/>
@@ -120,28 +156,51 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Button Content="{x:Static res:Strings.Btn_PcToPhone}" Command="{Binding OpenLocalAlbumCommand}"
+                    <Button Content="{x:Static res:Strings.Btn_SaveToPhoneAndroid}" Command="{Binding OpenLocalAlbumCommand}"
                             Margin="10,0,0,0" Padding="18,7">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource PageTabInactiveButtonStyle}">
                                 <Style.Triggers>
                                     <MultiDataTrigger>
                                         <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsLocalMode}" Value="True"/>
-                                            <Condition Property="IsMouseOver" Value="False"/>
+                                            <Condition Binding="{Binding IsAndroidPage}" Value="True"/>
+                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="False"/>
                                         </MultiDataTrigger.Conditions>
                                         <Setter Property="Background" Value="{DynamicResource PurpleBrush}"/>
                                         <Setter Property="Foreground" Value="White"/>
-                                        <Setter Property="BorderBrush" Value="{DynamicResource PurpleBrush}"/>
                                     </MultiDataTrigger>
                                     <MultiDataTrigger>
                                         <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsLocalMode}" Value="True"/>
-                                            <Condition Property="IsMouseOver" Value="True"/>
+                                            <Condition Binding="{Binding IsAndroidPage}" Value="True"/>
+                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
                                         </MultiDataTrigger.Conditions>
                                         <Setter Property="Background" Value="{DynamicResource PurpleHoverBrush}"/>
                                         <Setter Property="Foreground" Value="White"/>
-                                        <Setter Property="BorderBrush" Value="{DynamicResource PurpleBrush}"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Content="{x:Static res:Strings.Btn_SaveToPhoneIphone}" Command="{Binding OpenIphonePageCommand}"
+                            Margin="10,0,0,0" Padding="18,7">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PageTabInactiveButtonStyle}">
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsIphonePage}" Value="True"/>
+                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Background" Value="{DynamicResource PurpleBrush}"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </MultiDataTrigger>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsIphonePage}" Value="True"/>
+                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Background" Value="{DynamicResource PurpleHoverBrush}"/>
+                                        <Setter Property="Foreground" Value="White"/>
                                     </MultiDataTrigger>
                                 </Style.Triggers>
                             </Style>

@@ -1,0 +1,45 @@
+<Window x:Class="SwitchAlbum.Views.IphoneDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:res="clr-namespace:SwitchAlbum.Resources"
+        Title="{x:Static res:Strings.Iphone_Dialog_Title}"
+        Width="440" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+    <StackPanel Margin="26,22,26,20">
+        <TextBlock Text="{x:Static res:Strings.Iphone_UrlLabel}" FontSize="12.5"
+                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+        <!-- 二维码 -->
+        <Image x:Name="QrImage" Width="200" Height="200" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+
+        <!-- 地址 + 复制 -->
+        <Grid Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="10,7" VerticalAlignment="Center">
+                <TextBlock x:Name="UrlText" TextTrimming="CharacterEllipsis" FontSize="12.5" ToolTip="{Binding Text, ElementName=UrlText}"/>
+            </Border>
+            <Button Grid.Column="1" Content="{x:Static res:Strings.Iphone_CopyUrl}" Click="Copy_Click"
+                    Style="{StaticResource SubtleButtonStyle}" Margin="10,0,0,0" Padding="12,6" FontSize="12"/>
+        </Grid>
+
+        <!-- 步骤 -->
+        <StackPanel Margin="0,18,0,0">
+            <TextBlock Text="{x:Static res:Strings.Iphone_Step1}" Margin="0,0,0,6" TextWrapping="Wrap" FontSize="13"/>
+            <TextBlock Text="{x:Static res:Strings.Iphone_Step2}" Margin="0,0,0,6" TextWrapping="Wrap" FontSize="13"/>
+            <TextBlock Text="{x:Static res:Strings.Iphone_Step3}" Margin="0,0,0,6" TextWrapping="Wrap" FontSize="13"/>
+            <TextBlock Text="{x:Static res:Strings.Iphone_Step4}" Margin="0,0,0,6" TextWrapping="Wrap" FontSize="13"/>
+            <TextBlock Text="{x:Static res:Strings.Iphone_Note}" Margin="0,10,0,0" TextWrapping="Wrap" FontSize="11.5"
+                       Foreground="{DynamicResource TextSecondaryBrush}" LineHeight="18"/>
+        </StackPanel>
+
+        <Button Content="{x:Static res:Strings.Settings_Close}" Click="Close_Click"
+                Style="{StaticResource PrimaryButtonStyle}" MinWidth="96" HorizontalAlignment="Right" Margin="0,18,0,0"/>
+    </StackPanel>
+</Window>

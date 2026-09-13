@@ -1,3 +1,4 @@
+using System.Net.Http;
 using SwitchAlbum.Models;
 using SwitchAlbum.Services;
 
@@ -47,7 +48,8 @@ public static class SmokeTest
             var pcGameDirs = Directory.GetDirectories(settings.Current.SavePath).Select(Path.GetFileName).ToArray();
             ok &= pcGameDirs.Contains("塞尔达传说 王国之泪");
 
-            await using var phoneSession = await provider.ConnectAsync(devices.Single(d => !d.IsSwitch), CancellationToken.None);
+            var phoneDevice = (await provider.GetPhoneCandidateDevicesAsync(CancellationToken.None)).Single();
+            await using var phoneSession = await provider.ConnectAsync(phoneDevice, CancellationToken.None);
             var phoneResult = await phoneSaveService.SaveToPhoneAsync(
                 scan.AllItems, switchSession, phoneSession, autoRename: true, null, CancellationToken.None);
             lines.Add($"phone-save saved={phoneResult.SavedCount} skipped={phoneResult.SkippedCount} failed={phoneResult.Failed.Count}");
@@ -109,6 +111,37 @@ public static class SmokeTest
             {
                 ok = false;
                 lines.Add("cover exception: " + ex);
+            }
+
+            // iPhone 网页服务器：首页 + 全部 ZIP（本地相册页保存目录为源）
+            try
+            {
+                using var iphoneServer = new IphoneWebServer(settings.Current.SavePath, ip: "127.0.0.1", startPort: 53771);
+                iphoneServer.Start();
+                using var http = new HttpClient();
+
+                var home = await http.GetAsync(iphoneServer.Url);
+                var homeText = await home.Content.ReadAsStringAsync();
+                lines.Add($"iphone-home status={(int)home.StatusCode} hasZip={homeText.Contains("下载全部 ZIP")}");
+                ok &= home.StatusCode == System.Net.HttpStatusCode.OK && homeText.Contains("下载全部 ZIP");
+
+                var zipUrl = iphoneServer.Url.Replace("/?t=", "/zip?game=__all__&t=");
+                var zipResponse = await http.GetAsync(zipUrl);
+                var entries = 0;
+                if (zipResponse.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    await using var zipStream = await zipResponse.Content.ReadAsStreamAsync();
+                    using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read);
+                    entries = archive.Entries.Count;
+                }
+
+                lines.Add($"iphone-zip status={(int)zipResponse.StatusCode} entries={entries}");
+                ok &= zipResponse.StatusCode == System.Net.HttpStatusCode.OK && entries == scan.AllItems.Count;
+            }
+            catch (Exception ex)
+            {
+                ok = false;
+                lines.Add("iphone exception: " + ex);
             }
         }
         catch (Exception ex)

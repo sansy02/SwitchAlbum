@@ -16,35 +16,52 @@ public partial class App : Application
         DispatcherUnhandledException += (_, args) =>
         {
             // 未处理异常不崩溃：状态栏提示由各命令自行处理，这里兜底记录
-            System.Diagnostics.Debug.WriteLine("Unhandled: " + args.Exception);
+            Log.Error("未处理异常: " + args.Exception.Message, args.Exception);
             args.Handled = true;
         };
 
-        if (e.Args.Contains("--smoke-test"))
+        try
         {
-            SmokeTest.RunAsync();
-            return;
+            if (e.Args.Contains("--smoke-test"))
+            {
+                SmokeTest.RunAsync();
+                return;
+            }
+
+            _settings = new SettingsService();
+            _theme = new ThemeService(_settings);
+            ApplyTheme();
+            _theme.ThemeChanged += ApplyTheme;
+
+            var tracker = new DuplicateTracker();
+            var saveService = new SaveService(tracker);
+            var phoneSaveService = new PhoneSaveService(tracker, _settings);
+            var thumbnailService = new ThumbnailService();
+            var coverService = new CoverService();
+
+            var mainViewModel = new MainViewModel(
+                _settings, _theme, tracker, saveService, phoneSaveService,
+                thumbnailService, coverService, new ScanCacheService(), TitleDbService.LoadEmbedded());
+
+            var window = new MainWindow { DataContext = mainViewModel };
+            mainViewModel.AttachWindow(window);
+            MainWindow = window;
+            window.Show();
         }
+        catch (Exception ex)
+        {
+            Log.Error("启动失败", ex);
+            try
+            {
+                MessageBox.Show("启动失败：" + ex.Message, "SwitchAlbum", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch
+            {
+                // 弹窗失败忽略
+            }
 
-        _settings = new SettingsService();
-        _theme = new ThemeService(_settings);
-        ApplyTheme();
-        _theme.ThemeChanged += ApplyTheme;
-
-        var tracker = new DuplicateTracker();
-        var saveService = new SaveService(tracker);
-        var phoneSaveService = new PhoneSaveService(tracker, _settings);
-        var thumbnailService = new ThumbnailService();
-        var coverService = new CoverService();
-
-        var mainViewModel = new MainViewModel(
-            _settings, _theme, tracker, saveService, phoneSaveService,
-            thumbnailService, coverService, new ScanCacheService(), TitleDbService.LoadEmbedded());
-
-        var window = new MainWindow { DataContext = mainViewModel };
-        mainViewModel.AttachWindow(window);
-        MainWindow = window;
-        window.Show();
+            Shutdown(-1);
+        }
     }
 
     private void ApplyTheme()

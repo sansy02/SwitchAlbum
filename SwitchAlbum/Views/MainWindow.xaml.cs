@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
+using SwitchAlbum.Services;
 using SwitchAlbum.ViewModels;
 
 namespace SwitchAlbum.Views;
@@ -68,12 +69,22 @@ public partial class MainWindow : Window
         }
 
         var settings = _main.Settings;
-        Width = settings.WindowWidth;
-        Height = settings.WindowHeight;
-        if (!double.IsNaN(settings.WindowLeft) && !double.IsNaN(settings.WindowTop))
+        Width = Math.Min(settings.WindowWidth, SystemParameters.VirtualScreenWidth);
+        Height = Math.Min(settings.WindowHeight, SystemParameters.VirtualScreenHeight);
+
+        // 显示器布局可能已变化：保存的位置越出虚拟屏时不再恢复（交给 CenterScreen 居中），
+        // 防止窗口跑到屏幕外——进程在后台、界面却看不见。
+        if (WindowBounds.IsVisibleOnScreen(
+                settings.WindowLeft, settings.WindowTop, Width, Height,
+                SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+                SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight))
         {
             Left = settings.WindowLeft;
             Top = settings.WindowTop;
+        }
+        else if (!double.IsNaN(settings.WindowLeft) || !double.IsNaN(settings.WindowTop))
+        {
+            Log.Info($"保存的窗口位置越出当前屏幕（{settings.WindowLeft},{settings.WindowTop}），已重置为居中");
         }
 
         if (settings.WindowMaximized)

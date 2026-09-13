@@ -20,7 +20,9 @@ public static class Strings
     public const string Btn_SaveSelectedToPhone = "保存所选到手机";
     public const string Btn_SaveAllToPhone = "保存全部到手机";
     public const string Btn_SaveToPc = "保存到此电脑";
-    public const string Btn_PcToPhone = "从电脑保存到手机";
+    public const string Btn_SaveToPhoneAndroid = "保存到手机（安卓）";
+    public const string Btn_SaveToPhoneIphone = "保存到手机（苹果）";
+    public const string Btn_IphoneEntry = "iPhone 连接入口";
     public const string Btn_Settings = "设置";
     public const string Btn_ChangePath = "更改";
     public const string Btn_Cancel = "取消";
@@ -90,6 +92,22 @@ public static class Strings
     public const string Status_CacheClearedWithSize = "缓存已清除（释放 {0}）";
     public const string Settings_CacheSize = "当前缓存占用 {0}";
     public const string Settings_CacheSizeNone = "当前无缓存";
+
+    // 传输速度
+    public const string Status_SpeedSuffix = " · {0} MB/s";
+
+    // iPhone 网页方案
+    public const string Iphone_Dialog_Title = "保存到 iPhone";
+    public const string Iphone_ServerFailed = "局域网服务启动失败，请检查网络";
+    public const string Iphone_ServerRunning = "局域网服务已开启";
+    public const string Iphone_UrlLabel = "iPhone 浏览器访问地址";
+    public const string Iphone_CopyUrl = "复制地址";
+    public const string Iphone_Copied = "已复制";
+    public const string Iphone_Step1 = "① 手机与电脑连接同一个 WiFi";
+    public const string Iphone_Step2 = "② 用 iPhone 相机扫码，Safari 自动打开相册页";
+    public const string Iphone_Step3 = "③ 长按照片可单张「存储到照片」；批量请点「下载 ZIP」";
+    public const string Iphone_Step4 = "④ 下载后打开「文件」App → 解压 ZIP → 多选 → 共享 → 存储图像";
+    public const string Iphone_Note = "说明：iOS 不允许任何软件通过 USB 或网页直接写入相册，以上是苹果允许的官方流程";
     public const string Status_LocalAlbumTitle = "本机相册";
 
     // 通用

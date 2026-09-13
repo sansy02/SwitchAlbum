@@ -336,7 +336,8 @@ AddAsync("模拟: 保存到手机按游戏分文件夹", async () =>
         var phoneSave = new PhoneSaveService(tracker, settings);
         var devices = await provider.GetDevicesAsync(default);
         await using var switchSession = await provider.ConnectAsync(devices.Single(d => d.IsSwitch), default);
-        await using var phoneSession = await provider.ConnectAsync(devices.Single(d => !d.IsSwitch), default);
+        var phoneDevice = (await provider.GetPhoneCandidateDevicesAsync(default)).Single();
+        await using var phoneSession = await provider.ConnectAsync(phoneDevice, default);
         var scan = await AlbumScanner.ScanAsync(switchSession, null, default);
         if (scan == null)
         {
@@ -396,13 +397,110 @@ AddAsync("模拟: 本地目录扫描并保存到手机（本地相册页流程�
             && localScan.Games.Any(g => g.Title == "塞尔达传说 王国之泪");
 
         // 第三步：本地 → 手机
-        await using var phoneSession = await provider.ConnectAsync(devices.Single(d => !d.IsSwitch), default);
+        var phoneDevice = (await provider.GetPhoneCandidateDevicesAsync(default)).Single();
+        await using var phoneSession = await provider.ConnectAsync(phoneDevice, default);
         var r2 = await phoneSave.SaveToPhoneAsync(
             localScan!.AllItems, localSession, phoneSession, autoRename: true, null, default);
         var dcim = Path.Combine(root, "phone", "Internal shared storage", "DCIM", "SwitchAlbum");
         var gameDirOk = Directory.Exists(Path.Combine(dcim, "塞尔达传说 王国之泪"));
 
         return scanOk && r2.SavedCount == localScan.AllItems.Count && gameDirOk;
+    }
+    finally { Directory.Delete(root, recursive: true); }
+});
+
+// ---------- WindowBounds: 窗口位置自愈 ----------
+Add("窗口边界: 屏幕内有效", () =>
+    WindowBounds.IsVisibleOnScreen(100, 100, 800, 600, 0, 0, 1920, 1080));
+Add("窗口边界: 完全在屏幕外(右侧)无效", () =>
+    !WindowBounds.IsVisibleOnScreen(2000, 100, 800, 600, 0, 0, 1920, 1080));
+Add("窗口边界: 完全在屏幕外(左侧/负坐标)无效", () =>
+    !WindowBounds.IsVisibleOnScreen(-900, 100, 800, 600, 0, 0, 1920, 1080));
+Add("窗口边界: 上方越界(标题栏不可及)无效", () =>
+    !WindowBounds.IsVisibleOnScreen(100, -600, 800, 600, 0, 0, 1920, 1080));
+Add("窗口边界: 只剩小条可见(<100px)无效", () =>
+    !WindowBounds.IsVisibleOnScreen(1900, 100, 800, 600, 0, 0, 1920, 1080));
+Add("窗口边界: 多屏布局(副屏在右)有效", () =>
+    WindowBounds.IsVisibleOnScreen(2000, 100, 800, 600, 0, 0, 3840, 1080));
+Add("窗口边界: 显示器拔掉后副屏位置无效", () =>
+    !WindowBounds.IsVisibleOnScreen(2000, 100, 800, 600, 0, 0, 1920, 1080));
+
+// ---------- 设备分类: 外置硬盘不进手机候选 ----------
+AddAsync("设备分类: 手机候选不含模拟 MSC 硬盘", async () =>
+{
+    var root = TempDir();
+    try
+    {
+        Directory.CreateDirectory(root);
+        var provider = new MockMediaProvider(root, Path.Combine(root, "phone"));
+        var all = await provider.GetDevicesAsync(default);
+        var phones = await provider.GetPhoneCandidateDevicesAsync(default);
+
+        // 全量枚举里有硬盘与手机；候选列表只应有手机
+        return all.Count == 3
+            && all.Any(d => d.FriendlyName.Contains("硬盘"))
+            && phones.Count == 1
+            && phones[0].DeviceId == MockMediaProvider.PhoneDeviceId
+            && phones.All(p => p.IsPhoneCandidate);
+    }
+    finally { Directory.Delete(root, recursive: true); }
+});
+
+// ---------- iPhone 网页服务器 ----------
+AddAsync("iPhone 网页: 首页与 ZIP 批量下载", async () =>
+{
+    var root = TempDir();
+    try
+    {
+        DemoAlbumGenerator.Generate(root);
+        var outDir = Path.Combine(root, "out");
+        var provider = new MockMediaProvider(root, Path.Combine(root, "phone"));
+        var tracker = new DuplicateTracker(Path.Combine(root, "saved.json"));
+        var save = new SaveService(tracker);
+        var devices = await provider.GetDevicesAsync(default);
+        await using var switchSession = await provider.ConnectAsync(devices.Single(d => d.IsSwitch), default);
+        var scan = await AlbumScanner.ScanAsync(switchSession, null, default);
+        if (scan == null)
+        {
+            return false;
+        }
+
+        var r = await save.SaveToPcAsync(scan.AllItems, switchSession, outDir, autoRename: true, null, default);
+        if (r.SavedCount != scan.AllItems.Count)
+        {
+            return false;
+        }
+
+        using var server = new IphoneWebServer(outDir, ip: "127.0.0.1", startPort: 53791);
+        server.Start();
+
+        using var http = new HttpClient();
+        var home = await http.GetAsync(server.Url);
+        var homeText = await home.Content.ReadAsStringAsync();
+        var homeOk = home.StatusCode == System.Net.HttpStatusCode.OK
+            && homeText.Contains("下载全部 ZIP")
+            && homeText.Contains("塞尔达传说 王国之泪");
+
+        // 无 token 应拒绝
+        var noToken = await http.GetAsync($"http://127.0.0.1:{server.Port}/");
+        var noTokenOk = noToken.StatusCode == System.Net.HttpStatusCode.Forbidden;
+
+        var zipUrl = server.Url.Replace("/?t=", "/zip?game=__all__&t=");
+        var zipResponse = await http.GetAsync(zipUrl);
+        var zipOk = zipResponse.StatusCode == System.Net.HttpStatusCode.OK;
+        var entryCount = 0;
+        if (zipOk)
+        {
+            await using var zipStream = await zipResponse.Content.ReadAsStreamAsync();
+            using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read);
+            entryCount = archive.Entries.Count;
+        }
+
+        // 越界路径应 404
+        var badImg = await http.GetAsync($"http://127.0.0.1:{server.Port}/img?path=..%2F..%2FWindows%2Fwin.ini&t={new Uri(server.Url).Query[3..]}");
+        var badOk = badImg.StatusCode == System.Net.HttpStatusCode.NotFound;
+
+        return homeOk && noTokenOk && zipOk && entryCount == scan.AllItems.Count && badOk;
     }
     finally { Directory.Delete(root, recursive: true); }
 });

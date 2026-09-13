@@ -63,8 +63,21 @@
                             Style="{StaticResource SubtleButtonStyle}" Padding="10,5" FontSize="12" Margin="8,0,0,0"/>
                     <Button Content="{x:Static res:Strings.Btn_SaveSelectedToPhone}"
                             Command="{Binding DataContext.LocalSaveSelectedToPhoneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                            IsEnabled="{Binding CanSaveSelected}"
-                            Style="{StaticResource AccentOutlineButtonStyle}" Margin="12,0,0,0" Padding="12,5" FontSize="12"/>
+                            IsEnabled="{Binding CanSaveSelected}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource AccentOutlineButtonStyle}">
+                                <Setter Property="Padding" Value="12,5"/>
+                                <Setter Property="FontSize" Value="12"/>
+                                <Setter Property="Margin" Value="12,0,0,0"/>
+                                <Style.Triggers>
+                                    <!-- 苹果页走扫码网页方案，无 MTP 传输按钮 -->
+                                    <DataTrigger Binding="{Binding DataContext.IsIphonePage, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>

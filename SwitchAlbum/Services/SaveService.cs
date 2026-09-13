@@ -3,7 +3,7 @@ using SwitchAlbum.Services.Parsing;
 
 namespace SwitchAlbum.Services;
 
-public sealed record SaveProgress(int Total, int Done, int Skipped, string? CurrentFileName);
+public sealed record SaveProgress(int Total, int Done, int Skipped, string? CurrentFileName, long BytesDone = 0);
 
 public sealed class SaveResult
 {
@@ -92,8 +92,9 @@ public sealed class SaveService
         var failures = new List<(AlbumItem Item, string Error)>();
         var done = 0;
         var saved = 0;
+        long bytesDone = 0;
 
-        progress?.Report(new SaveProgress(items.Count, done, skipped, null));
+        progress?.Report(new SaveProgress(items.Count, done, skipped, null, 0));
 
         var tasks = pending.Select(item => _queue.EnqueueAsync(async _ =>
         {
@@ -107,7 +108,7 @@ public sealed class SaveService
                     done++;
                 }
 
-                progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName));
+                progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName, bytesDone));
                 return;
             }
 
@@ -117,6 +118,7 @@ public sealed class SaveService
             {
                 await session.DownloadFileAsync(item.DevicePath, tmpPath, ct).ConfigureAwait(false);
                 ct.ThrowIfCancellationRequested();
+                var bytes = new FileInfo(tmpPath).Length;
                 File.Move(tmpPath, finalPath, overwrite: true);
                 _tracker.MarkSaved(item.GameTitle, item.FileName, Path.GetFileName(finalPath), toPc: true, toPhone: false);
 
@@ -124,9 +126,10 @@ public sealed class SaveService
                 {
                     done++;
                     saved++;
+                    bytesDone += bytes;
                 }
 
-                progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName));
+                progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName, bytesDone));
             }
             catch (OperationCanceledException)
             {
@@ -142,7 +145,7 @@ public sealed class SaveService
                     done++;
                 }
 
-                progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName));
+                progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName, bytesDone));
             }
         }, ct)).ToList();
 
