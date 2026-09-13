@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>SwitchAlbum</RootNamespace>
     <AssemblyName>SwitchAlbum</AssemblyName>
-    <Version>1.0.6</Version>
+    <Version>1.0.7</Version>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
@@ -16,6 +16,7 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="MediaDevices" Version="2.0.0" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.12" />
   </ItemGroup>
 
@@ -23,6 +24,7 @@
     <EmbeddedResource Include="Resources\titles.json" LogicalName="SwitchAlbum.Resources.titles.json" />
     <EmbeddedResource Include="Resources\TSCharacters.txt" LogicalName="SwitchAlbum.Resources.TSCharacters.txt" />
     <EmbeddedResource Include="Resources\covers.zip" LogicalName="SwitchAlbum.Resources.covers.zip" Condition="Exists('Resources\covers.zip')" />
+    <EmbeddedResource Include="Resources\iphone-page.html" LogicalName="SwitchAlbum.Resources.iphone-page.html" />
   </ItemGroup>
 
 </Project>
